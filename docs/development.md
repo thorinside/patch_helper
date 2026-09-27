@@ -111,3 +111,16 @@ The native harness proves the callback payload, not that outer envelope.
    a sandbox for arbitrary downloaded Lua.
 
 No production tag, device deployment, or Substrate approval has been performed.
+
+## Editor revision supersedes the initial-slice limitations
+
+The SD-card host Lua requirement is implemented in this revision; see
+[companion-contract.md](companion-contract.md). Native-only presets retain
+version 1. Version 2 adds named expander objects and eight connection records
+per instance. Moves preserve each bank's cable data. The map and deserialization
+scratch space are per-instance host-allocated SRAM, about 27 KiB combined.
+ARM stack inspection found deserialization at 48 bytes plus its bounded parser
+calls (largest individual frame 320 bytes), not a full expanded map on stack.
+The audio callback only updates the First socket parameter range when inventory
+changes; it leaves all audio/CV buffers untouched. Older initial-slice notes
+above describe revision 1 and must not be used to defer the Lua companion again.

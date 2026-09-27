@@ -3,13 +3,13 @@
 A physical cable reference for disting NT. It records intended connections;
 it does not detect cables, route signals, or modify audio/CV.
 
-**Development preview — not a finished editor or a production release.**
+**Development preview — requires the matching NT Helper branch; not a production release.**
 
-The current plug-in displays a preset-owned map containing the twelve native
-inputs and eight native outputs. Each socket has a destination, cable colour,
+The plug-in displays a preset-owned map containing the twelve native
+inputs, eight native outputs, and manually added eight-output expanders. Each socket has a destination, cable colour,
 optional Tag (1–12), and group. An empty destination means unused. Clearing it
-preserves the other cable metadata. The map has an editable title in its saved
-data, but text editing is not yet exposed on the device or in Helper.
+preserves the other cable metadata. The SD-card Lua companion provides the Helper editor, including the map title.
+On-device text editing remains pending.
 
 The NT screen shows four rows at a time. Use **View → First socket** to scroll.
 Unused sockets remain visible. Long destinations are clipped on screen only;
@@ -30,11 +30,17 @@ tests. Before editing a hardware preset, export a preset containing the plugin
 and confirm where the firmware embeds its custom serialization object; that
 outer preset envelope has not yet been verified on a device.
 
-Revision 2 adds an acknowledged USB map bridge and a matching Helper client,
-with preset-change protection and recovery after interrupted edits. See the
-[live map protocol](docs/live-map-protocol.md). The visible Helper editor,
-on-device text editing, expanders, sorting, and SD-card companion Lua loading
-remain subsequent work. This branch does not yet expose a visible Helper UI.
+Install `helper/ThPh.lua` at the SD-card root alongside the `programs`
+folder. In NT Helper, open the Patch Helper slot and choose **Load SD companion**.
+Helper downloads `/helper/ThPh.lua` and runs it on the computer.
+The file defines the straight table and clickable socket minimap. Apply each
+edited row or press Enter, then use the normal **Save preset** action to keep
+acknowledged changes on the NT. Reload after any uncertain write.
 
+Add NTX-8CV, ES-5, ESX-8GT, or ESX-8CV from the dropdown. Each adds eight physical
+output records. Expander section actions rename instances and move their whole
+banks, retaining cable records. This does not configure an expander's electronic
+connection or change routing. See the [companion contract](docs/companion-contract.md)
+and [live map protocol](docs/live-map-protocol.md).
 See [development notes](docs/development.md) for build commands, format details,
 the originating Substrate spec, and the remaining integration work.

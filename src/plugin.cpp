@@ -9,7 +9,9 @@
 namespace {
 struct Algorithm : _NT_algorithm {
     patch_helper::PatchMap map;
+    patch_helper::PatchMap scratch;
     patch_helper::Session session;
+    _NT_parameter viewParameter{};
 };
 constexpr _NT_parameter parameters[] = {
     {"First socket", 1, 20, 1, kNT_unitNone, 0, nullptr},
@@ -26,26 +28,38 @@ void requirements(_NT_algorithmRequirements& req, const int32_t*) {
 _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
                          const _NT_algorithmRequirements&, const int32_t*) {
     auto* algorithm = new (ptrs.sram) Algorithm();
-    algorithm->parameters = parameters;
+    algorithm->viewParameter = parameters[0];
+    algorithm->parameters = &algorithm->viewParameter;
     algorithm->parameterPages = &parameterPages;
     return algorithm;
 }
 // A descriptive map must never touch audio, CV, or routing.
-void step(_NT_algorithm*, float*, int) {}
+void step(_NT_algorithm* self, float*, int) {
+    auto& algorithm = *static_cast<Algorithm*>(self);
+    if (algorithm.viewParameter.max != algorithm.map.socketCount()) {
+        algorithm.viewParameter.max = algorithm.map.socketCount();
+        NT_updateParameterDefinition(NT_algorithmIndex(self), 0);
+    }
+}
 
 bool draw(_NT_algorithm* self) {
     const auto& algorithm = *static_cast<const Algorithm*>(self);
     NT_drawText(0, 9, algorithm.map.title);
     int first = self->v ? self->v[0] - 1 : 0;
     if (first < 0) first = 0;
-    if (first >= patch_helper::kSocketCount) first = patch_helper::kSocketCount - 1;
-    for (int row = 0; row < 4 && first + row < patch_helper::kSocketCount; ++row) {
+    if (first >= algorithm.map.socketCount()) first = algorithm.map.socketCount() - 1;
+    for (int row = 0; row < 4 && first + row < algorithm.map.socketCount(); ++row) {
         const int socket = first + row;
         const auto& connection = algorithm.map.connections[socket];
         char label[16]{};
-        const bool input = socket < 12;
-        std::strcpy(label, input ? "In " : "Out ");
-        NT_intToString(label + std::strlen(label), input ? socket + 1 : socket - 11);
+        if (socket >= 20) {
+            std::strcpy(label, "E"); NT_intToString(label + 1, (socket - 20) / 8 + 1);
+            std::strcat(label, ":"); NT_intToString(label + std::strlen(label), (socket - 20) % 8 + 1);
+        } else {
+            const bool input = socket < 12;
+            std::strcpy(label, input ? "In " : "Out ");
+            NT_intToString(label + std::strlen(label), input ? socket + 1 : socket - 11);
+        }
         const int y = 21 + row * 13;
         NT_drawText(0, y, label, 15, kNT_textLeft, kNT_textTiny);
         NT_drawText(33, y, patch_helper::kColours[connection.colour], 15, kNT_textLeft, kNT_textTiny);
@@ -62,7 +76,7 @@ void serialise(_NT_algorithm* self, _NT_jsonStream& stream) {
 }
 bool deserialise(_NT_algorithm* self, _NT_jsonParse& parse) {
     auto& algorithm = *static_cast<Algorithm*>(self);
-    if (!patch_helper::readMap(algorithm.map, parse)) return false;
+    if (!patch_helper::readMap(algorithm.map, parse, algorithm.scratch)) return false;
     algorithm.session = {};
     return true;
 }
