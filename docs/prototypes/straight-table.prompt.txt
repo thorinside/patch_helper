@@ -1,0 +1,18 @@
+Create a clean high-fidelity UI prototype by revising the supplied NT Helper screenshot. The user rejected card, grid, split-pane and expanded-row concepts and has now explicitly chosen ONE STRAIGHT TABLE. This must look like a practical, plain native data-entry table, not a dashboard or a marketing image.
+
+Make a tall full-page desktop-editor capture approximately 1200 px wide by 1800 px high so all 36 socket rows are visible. Preserve only the reference's small "NT Helper" app title, unobtrusive algorithm sidebar with "Patch Helper" selected, system sans-serif and dark Material theme. Remove the reference's unrelated algorithm controls and black exterior screenshot margins. Use truly FLAT SOLID dark backgrounds, subtle horizontal table rules, readable near-white 15–16 px body text; no glows, gradients, shadows, big headings or decorative cards. The table occupies essentially all the content width. There is no inspector, no editing tray, no expanded row, no socket matrix, no side-by-side lists.
+
+At the top of the content, one modest title row reads "Evening patch" and a small secondary label "Sample patch · Visual prototype". A compact toolbar on that same upper area has "Add expander", "Reload from NT" and "Save preset". One small helper sentence: "Edit cells directly. Send changes to NT, then save the preset."
+
+Immediately below is one conventional table with a SINGLE column header row: "Socket" | "Destination" | "Cable colour" | "Tag" | "Group". Widths approximately 18%, 40%, 18%, 8%, 16%. Destination is the dominant text column. Each row is the same compact 32px height, no thick outlines or badges. Colour is an ordinary small swatch plus its text name; empty cells show a simple em dash. Keep every socket row, including unused ones. Put a subtle focused border only around the Out 1 Destination cell containing "Mimeophon L"; it is edited in place, with NO extra fields beneath.
+
+There are FOUR thin full-width section separator rows in this EXACT vertical order. They belong to the same continuous table and share the same column alignment:
+1. "Inputs" followed by exactly twelve rows: In 1, In 2, In 3, In 4, In 5, In 6, In 7, In 8, In 9, In 10, In 11, In 12.
+2. "Outputs" followed by exactly eight rows: Out 1 through Out 8.
+3. "Expander 1 · NTX-8CV · CV rack" followed by exactly eight rows labelled 1 / Out 1, 1 / Out 2, 1 / Out 3, 1 / Out 4, 1 / Out 5, 1 / Out 6, 1 / Out 7, 1 / Out 8.
+4. "Expander 2 · ES-5 · Gates" followed by exactly eight rows labelled 2 / Out 1 through 2 / Out 8.
+Do not omit, repeat or renumber any rows. The screenshot must show the bottom of the second expander. The section bars must be thin, not large headings.
+
+Populate ONLY these sample cells, leave all other data cells empty: In 1: Plaits out, Red, 1, Voices. In 2: Rings odd, Orange, 2, Voices. In 3: Pam clock, Yellow, 3, Clock. In 4: Marbles X1, Green, 4, Modulation. Out 1: Mimeophon L, Blue, 5, Effects. Out 2: Mimeophon R, Blue, 6, Effects. Out 3: Mixer ch 1, White, 7, Mix. Out 4: Mixer ch 2, White, 8, Mix. Expander 1 Out 1: Plaits V/oct, Purple, 9, Voices. Expander 1 Out 2: Rings V/oct, Pink, 10, Voices. Expander 2 Out 1: Plaits trig, Yellow, 11, Gates. Expander 2 Out 2: Rings strum, Orange, 12, Gates.
+
+At the bottom beneath the complete table, a quiet line reads "Add expander types: NTX-8CV · ES-5 · ESX-8GT · ESX-8CV". A compact final action row has "Discard changes" as a text action and ONE ordinary filled teal button "Send changes to NT". This is a manually configured cable map. No detection claims, no wire paths, no routing controls. The image's entire purpose is to show a straightforward ordered table with inputs, outputs, then successive eight-output expander blocks.

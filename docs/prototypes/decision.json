@@ -1,0 +1,28 @@
+{
+  "title": "Straight table \u2014 revised prototype",
+  "question": "Your requested order: inputs, outputs, then eight outputs per expander. Edit cells directly in one table. Sample data; expander support is proposed.",
+  "options": [
+    {
+      "id": "straight-table",
+      "label": "Straight table",
+      "thesis": "One ordered cable worksheet with direct cell editing.",
+      "palette": [
+        "#00BFA5",
+        "#101A1A",
+        "#E1E8E5"
+      ],
+      "materials": [
+        "Helper Material table",
+        "plain labeled rows"
+      ],
+      "viewport": "Inputs 1\u201312, outputs 1\u20138, then eight-row blocks for each named expander.",
+      "risk": "Long maps need a sticky column header and clear handling of partly sent edits.",
+      "comp": ".impeccable/mocks/decision/straight-table.png"
+    }
+  ],
+  "steer": true,
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  }
+}

@@ -1,0 +1,121 @@
+SURFACE CONCEPT SEED (key: 6ecc0b10; mode: operate; source: api; approved pool: c3b204a1eed6; 306/564 human-approved; rerun with --scope surface --mode operate --from 6ecc0b10 --candidate-count 6 to reproduce this roll against this catalog revision)
+DEALT INDICES: 5, 4, 6 (index 5 leads)
+  After ordering the task's grounded structural candidates by resonance,
+  deal candidates 5, 4, 6 of your own grounded list to the
+  table; index 5 leads, and the deal never points at a challenger.
+  The deal is the roll, not a suggestion: the dice decide which structures
+  reach the user, so the ranking rut stays broken while the user still gets a
+  real choice, and the full ranked list stays yours. In an attended run,
+  present the three dealt structures as full cards of equal salience, the
+  lead carrying kicker THE ROLL, with steer and re-roll, and let the user
+  lock one in; the world is already settled, so this choice is composition.
+  Visualize every dealt card: with image generation available and a
+  comp-led default (.impeccable/config.json buildPath; the page toggle
+  handles the exception), declare a comp per card and generate after
+  serving, lead first; otherwise author each card's wireframe field (see
+  serve-question --schema) and the page draws the schematic. Carry the
+  recorded default in the payload as buildPath with toggle: true. Locking a card
+  approves its comp: a surface round that put three visualized structures on
+  the table replaces the three-option comp round in visualize.md. Re-roll
+  yourself only when every dealt structure fails audience identification or
+  product clarity on named factual grounds.
+  The assignment exists to refuse the model's ranking rut, never to outrank
+  the user or the brief. Never expose assignment metadata in user-facing labels.
+CHALLENGERS:
+  1. a single square of vermilion washi becoming an orizuru crane through thirty-two deliberate folds, where one uncut sheet passes from flat geometry to beak, wings, hollow body, and a balanced standing silhouette
+     SOURCE ID: paper-folds-pleats-deployable-orizuru-crane-sequence
+     CREATIVE SPARK: The red square closes into a small diamond, opens into a long-necked bird, and with one final pull spreads two crisp wings that still carry every earlier crease.
+     SYSTEM GRAMMAR:
+       - Palette/material: vermilion washi as ground with visible kozo fiber, crease lines in faded fold-white, one gold dot marking the active step, notes in sumi black ink
+       - Type/composition: quiet humanist sans beside kanji step names, folds numbered one to thirty-two in a strict margin column, diagrams square and centered like the uncut sheet
+       - Topology/navigation: Connect face, edge, mountain crease, valley crease, preliminary base, bird base, flap, and finished crane as one continuous sheet.
+       - Controls/state: Fold, unfold, rotate, reverse, and replay with flat, creased, collapsed, based, locked, finished, and recoverable states.
+       - Responsive/motion: Pair the active crease pattern with one authored spatial view and provide discrete fold states under
+     WEB LEVERAGE: Constraint-aware direct manipulation can prevent impossible folds, synchronize the crease pattern with the spatial crane, and deep-link any recoverable step for teaching or return.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/paper-folds-pleats-deployable-orizuru-crane-sequence.webp · hero https://impeccable.style/worlds/cards/paper-folds-pleats-deployable-orizuru-crane-sequence-hero.webp
+  2. a tensegrity column of carbon rods and red cord, where opposing forces make a rigid body appear to inhale and lengthen
+     SOURCE ID: kinetic-sculpture-automata-tensegrity-breathing-column
+     CREATIVE SPARK: The cords tighten in sequence; black rods float apart without touching, and the column rises as if drawing a slow breath.
+     SYSTEM GRAMMAR:
+       - Palette/material: matte carbon-black rods on a pale concrete ground, red cord as the tension accent, slack members dropping to ash gray
+       - Type/composition: engineering monospaced labels with force values, annotations pinned to nodes on leader lines, layout obeys the strut network not a page grid
+       - Topology/navigation: Expose a network of tension and compression paths, letting users trace any load to its counterforce.
+       - Controls/state: Pull, release, lock, and compare members while slack, balanced, stressed, and failed states are distinct.
+       - Responsive/motion: Flatten the column into a force diagram on compact screens and substitute before-after poses for continuous breathing.
+     WEB LEVERAGE: A constraint graph can drive both spatial geometry and a semantic force diagram from the same underlying state.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/kinetic-sculpture-automata-tensegrity-breathing-column.webp · hero https://impeccable.style/worlds/cards/kinetic-sculpture-automata-tensegrity-breathing-column-hero.webp
+  3. a design annual's plate section on uncoated near-white stock, where registration crosshairs mark every plate corner, a letterpressed circular attribution stamp sits half off the image, hairline rules divide the credits row, and one grotesque carries display and caption alike
+     SOURCE ID: design-annual-s-plate-section
+     CREATIVE SPARK: The sheet is almost white but never neutral: it drifts warm at one corner and green at another, so the ink reads as printed rather than rendered. Everything else is registration furniture — crosses, dots, hairlines — and a single periwinkle stamp to prove a human signed it.
+     SYSTEM GRAMMAR:
+       - Palette/material: ground #F5F4F6, drifting to #FAF6F5 and #EEF3EF at edges; ink #16181A never pure black; single accent seal #DCDDF3; hairlines #C9C7C4 1px; photography untinted.
+       - Type/composition: one grotesque throughout — 400 weight, 92px display at -0.02em, 17px body; labels 11px mono uppercase at 0.14em; 12-col grid, 40px gutters, no italics.
+       - Topology/navigation: one continuous sheet; 72px sticky bar of mono tokens; crosshair plus marks register plate corners; 8px dot matrix fills voids; hairlines split the 4-up row.
+       - Controls/state: primary is a filled #16181A rect, 0 radius, mono caps 0.12em; secondary a 1px outline rect; nav arrows 44px circles; background inverts 0.1s ease.
+       - Responsive/motion: stamp's text ring turns 25s linear infinite and lifts 4px on hover 0.6s cubic-bezier(.19,1,.22,1); tiles step one column at that curve; no parallax.
+     WEB LEVERAGE: Sticky mono token bar, SVG textPath stamp on infinite linear rotation, pointer-local dot-matrix fades, and a whole grid built from 1px hairlines and CSS crosshairs.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/design-annual-s-plate-section.webp · hero https://impeccable.style/worlds/cards/design-annual-s-plate-section-hero.webp
+  4. a reference-setting page drawn by a ruling engine, two short-measure text columns twinned around a fixed centre rail of keys, the whole block held small inside a wide annotation margin where the apparatus hangs and overlaps the block's edge
+     SOURCE ID: rw-centre-rail-reference-setting
+     CREATIVE SPARK: A wide-margin edition open under a lamp: two dense columns of small roman, a hairline channel of vermilion letter-keys running down between them, and four inches of bare paper all around where a previous reader has ruled one note and bracketed it back into the line it belongs to.
+     SYSTEM GRAMMAR:
+       - Palette/material: iron-black ink and one rubric vermilion on unbleached bone, three values only. A ruling engine draws every rule, bracket and detent at one device pixel.
+       - Type/composition: Brevier body is Miller Text 17 to 19px on 1.5 leading, two columns of 34 to 40 characters round a 6 to 9 character rail. Pearl 11px small caps sets apparatus.
+       - Topology/navigation: the centre rail is the one moving part, carrying keys and square detents cut wherever the flow changes footing. Global nav is a keyed list in the margin.
+       - Controls/state: states are printed marks. A detent is hairline at rest, filled pressed, run through when disabled, bracketed on focus; spent is a struck bar. No radius anywhere.
+       - Responsive/motion: the block holds its measure and the annotation margin absorbs width; under two columns the rail goes outboard. Motion is a damped single axis, no overshoot.
+     WEB LEVERAGE: The ruling engine is real: a canvas or SVG layer reads live layout boxes and draws every hairline, detent and bracket at one device pixel, re-solving on resize and zoom. The lift relocates in-flow when the margin cannot hold it.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/rw-centre-rail-reference-setting.webp · hero https://impeccable.style/worlds/cards/rw-centre-rail-reference-setting-hero.webp
+  5. a broadcast teletext magazine, three-digit pages of block-mosaic graphics and double-height headers held in a 40 by 24 character grid on black
+     SOURCE ID: broadcast-programming-teletext-service
+     CREATIVE SPARK: You key 302 and the header counts pages in the corner; the screen blinks and a football score builds itself from cyan blocks on black, and behind the quiz question an answer waits invisible until your thumb finds REVEAL.
+     SYSTEM GRAMMAR:
+       - Palette/material: the fixed broadcast eight on flat black, white for body text, yellow for headlines, cyan for live figures, red reserved for alerts and REVEAL answers
+       - Type/composition: one bitmap face in a rigid 40 by 24 cell grid, double-height rows for section headers, block-mosaic sixels drawing every graphic from the same cells
+       - Topology/navigation: every page holds a three-digit address keyed directly; magazines group by hundreds and subpages rotate on a timed carousel you can hold
+       - Controls/state: keying digits is the whole input; loading counts page numbers in the header, hidden answers wait behind REVEAL, held subpages show a HOLD flag
+       - Responsive/motion: the 40-cell row is sacred, small screens scale the cell rather than reflow; motion is subpage rotation and blink, both stoppable to a held still
+     WEB LEVERAGE: ch-unit CSS grid and a bitmap face keep the 40 by 24 cell lattice exact; keyboard digits route pages and a REVEAL state toggles hidden spans
+     QUALITY BAR: board https://impeccable.style/worlds/cards/broadcast-programming-teletext-service.webp · hero https://impeccable.style/worlds/cards/broadcast-programming-teletext-service-hero.webp
+  6. a HyperCard shoebox stack, where black-and-white cards link through buttons anyone can paint and the tool for reading is also the tool for making
+     SOURCE ID: medium-native-hypercard-stack-shoebox
+     CREATIVE SPARK: A shoebox of black-and-white cards where clicking a hand-painted button flips you somewhere the author felt you should go next, and the paint tools are one menu away.
+     SYSTEM GRAMMAR:
+       - Palette/material: one-bit black on white with stipple-dither grays and no color anywhere, the pressed button inverting to solid black as its active state
+       - Type/composition: bold Chicago-style pixel menus over Geneva-style body text, cards composing as fixed rectangles with hand-drawn borders and painted buttons
+       - Topology/navigation: space is a stack of cards linked by visible buttons; back retraces your exact trail through them.
+       - Controls/state: every card is editable in place; browse and author are two modes of the same object.
+       - Responsive/motion: cards keep fixed proportions and dissolve between each other
+     WEB LEVERAGE: History API and deep links make every card addressable, while in-place editing keeps reader and author one keypress apart.
+     QUALITY BAR: board https://impeccable.style/worlds/cards/medium-native-hypercard-stack-shoebox.webp · hero https://impeccable.style/worlds/cards/medium-native-hypercard-stack-shoebox-hero.webp
+A challenger wins only when its fused result beats the grounded list on
+  audience identification and product clarity. It may change task topology or
+  interaction, but never the committed visual identity.
+When you can view images, open the QUALITY BAR board and hero for any
+challenger you weigh seriously and for the world you build. They exist as a
+craft bar, the finish level and commitment the build is expected to reach,
+never as a mockup to copy; your surface serves this product, not that render.
+PRODUCT.md and DESIGN.md constrain every surface candidate's identity
+vocabulary; they do not cancel task-level composition. The seed never
+authorizes a new palette, type system, material world, or unfamiliar control
+behavior.
+The CREATIVE SPARK is a complete visual system, not a theme or decorative
+reference. Translate every supplied system rule into the product: palette and
+material, type and composition, topology, controls and states, and adaptation.
+Keep the source's visible character, scale, rhythm, and interaction instead of
+reducing vivid grammar to generic nouns. When the source is already a credible
+interface language, commit to it across navigation, content, controls, and
+states. Otherwise keep a literal carrier only when it becomes functional.
+Ambitious motion, spatial media, or interaction is welcome when it strengthens
+the product without weakening semantics, performance, or fallback behavior.
+TELEMETRY: after the user's choice resolves, rerun this script once with
+  --kind <assigned|pick|challenger|canon> --from 6ecc0b10 --scope surface --mode operate,
+  adding --chosen <challenger-id> when a dealt challenger won and keeping
+  --register <safer|bolder> when the resolved round came from a steered hand.
+  One ping per resolved attended round. The ping is anonymous, the card kind
+  plus the catalog id when one won; your grounded candidates' names never
+  leave the machine, and the ping is skipped automatically when DO_NOT_TRACK
+  or IMPECCABLE_NO_TELEMETRY is set.
+A user- or brief-pinned decision beats the roll, always.
+DEALT INDICES (restated for truncated readers): 5, 4, 6; index
+5 leads. Present all three dealt structures; seed key 6ecc0b10.
