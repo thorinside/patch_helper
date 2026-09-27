@@ -28,7 +28,7 @@ _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
 void step(_NT_algorithm*, float*, int) {}
 
 bool draw(_NT_algorithm* self) {
-    auto& algorithm = *static_cast<Algorithm*>(self);
+    const auto& algorithm = *static_cast<const Algorithm*>(self);
     NT_drawText(0, 9, algorithm.map.title);
     int first = self->v ? self->v[0] - 1 : 0;
     if (first < 0) first = 0;
