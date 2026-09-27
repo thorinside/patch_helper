@@ -24,10 +24,11 @@ successful ARM build alone.
 
 For owner testing, the built `plugins/patch_helper.o` belongs under
 `programs/plug-ins/` on the SD card. Restart or remount the card, then select
-**Patch Helper** from Add algorithm. New instances show unused sockets. To
-exercise populated maps before the editor exists, add the `patch_helper` object
-from the [fixture](tests/fixtures/native-map.json) to that algorithm's saved
-preset slot and reload the preset. Keep a copy of the original preset.
+**Patch Helper** from Add algorithm. New instances show unused sockets. The
+[fixture](tests/fixtures/native-map.json) exercises populated maps in native
+tests. Before editing a hardware preset, export a preset containing the plugin
+and confirm where the firmware embeds its custom serialization object; that
+outer preset envelope has not yet been verified on a device.
 
 Live Helper synchronization, on-device text editing, expanders, sorting, and
 SD-card companion Lua loading are subsequent work. The matching nt_helper

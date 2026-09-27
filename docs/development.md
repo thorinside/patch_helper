@@ -88,6 +88,10 @@ The fixture is also stored in nt_helper at
 `test/fixtures/patch_map/native-map.json`. Keep both copies identical when the
 format changes. Helper's `PatchMapPresetCodec` accepts one full slot object;
 it validates GUID `ThPh` and preserves the rest of that slot on writes.
+The direct placement of `patch_helper` in that slot is a provisional integration
+contract. Confirm the firmware's actual custom-data envelope from an exported
+device preset before wiring this codec into user-facing preset operations.
+The native harness proves the callback payload, not that outer envelope.
 
 ## Next integration slices
 
