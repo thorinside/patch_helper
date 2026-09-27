@@ -7,11 +7,11 @@ ARM_FLAGS = -mcpu=cortex-m7 -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Os -fPIC -f
 
 all: hardware
 hardware: plugins/patch_helper.o
-plugins/patch_helper.o: src/plugin.cpp src/patch_map.h distingNT_API/include/distingnt/api.h
+plugins/patch_helper.o: src/plugin.cpp src/patch_map.h src/patch_protocol.h distingNT_API/include/distingnt/api.h
 	mkdir -p plugins
 	$(ARM_CXX) $(COMMON) $(ARM_FLAGS) -c $< -o $@
 
-build/tests: tests/test_plugin.cpp tests/json_adapter.h src/plugin.cpp src/patch_map.h
+build/tests: tests/test_plugin.cpp tests/json_adapter.h src/plugin.cpp src/patch_map.h src/patch_protocol.h
 	mkdir -p build
 	$(NATIVE_CXX) $(COMMON) $(JSON_FLAGS) -g -fsanitize=address,undefined tests/test_plugin.cpp src/plugin.cpp -o $@
 test: build/tests

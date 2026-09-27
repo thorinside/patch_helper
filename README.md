@@ -3,7 +3,7 @@
 A physical cable reference for disting NT. It records intended connections;
 it does not detect cables, route signals, or modify audio/CV.
 
-**Development foundation — not a finished editor or a production release.**
+**Development preview — not a finished editor or a production release.**
 
 The current plug-in displays a preset-owned map containing the twelve native
 inputs and eight native outputs. Each socket has a destination, cable colour,
@@ -30,9 +30,11 @@ tests. Before editing a hardware preset, export a preset containing the plugin
 and confirm where the firmware embeds its custom serialization object; that
 outer preset envelope has not yet been verified on a device.
 
-Live Helper synchronization, on-device text editing, expanders, sorting, and
-SD-card companion Lua loading are subsequent work. The matching nt_helper
-branch currently adds validated preset-data APIs and tests, not a visible UI.
+Revision 2 adds an acknowledged USB map bridge and a matching Helper client,
+with preset-change protection and recovery after interrupted edits. See the
+[live map protocol](docs/live-map-protocol.md). The visible Helper editor,
+on-device text editing, expanders, sorting, and SD-card companion Lua loading
+remain subsequent work. This branch does not yet expose a visible Helper UI.
 
 See [development notes](docs/development.md) for build commands, format details,
 the originating Substrate spec, and the remaining integration work.

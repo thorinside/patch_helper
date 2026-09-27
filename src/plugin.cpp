@@ -1,10 +1,16 @@
+#include <cstddef>
 #include <distingnt/api.h>
 #include <distingnt/serialisation.h>
+#include <distingnt/slot.h>
 #include <new>
 #include "patch_map.h"
+#include "patch_protocol.h"
 
 namespace {
-struct Algorithm : _NT_algorithm { patch_helper::PatchMap map; };
+struct Algorithm : _NT_algorithm {
+    patch_helper::PatchMap map;
+    patch_helper::Session session;
+};
 constexpr _NT_parameter parameters[] = {
     {"First socket", 1, 20, 1, kNT_unitNone, 0, nullptr},
 };
@@ -55,7 +61,23 @@ void serialise(_NT_algorithm* self, _NT_jsonStream& stream) {
     patch_helper::writeMap(static_cast<Algorithm*>(self)->map, stream);
 }
 bool deserialise(_NT_algorithm* self, _NT_jsonParse& parse) {
-    return patch_helper::readMap(static_cast<Algorithm*>(self)->map, parse);
+    auto& algorithm = *static_cast<Algorithm*>(self);
+    if (!patch_helper::readMap(algorithm.map, parse)) return false;
+    algorithm.session = {};
+    return true;
+}
+void midiSysEx(const uint8_t* data, uint32_t size) {
+    // Firmware callbacks use unframed data; accepting framed input also makes
+    // the development bridge usable with hosts that retain MIDI delimiters.
+    if (size >= 2 && data[0] == 0xf0 && data[size - 1] == 0xf7) { ++data; size -= 2; }
+    if (!patch_helper::isRequest(data, size)) return;
+    _NT_slot slot;
+    if (!NT_getSlot(slot, data[7]) || slot.guid() != NT_MULTICHAR('T', 'h', 'P', 'h')) return;
+    auto* algorithm = static_cast<Algorithm*>(slot.plugin());
+    if (!algorithm) return;
+    uint8_t reply[128]{};
+    const auto length = patch_helper::respond(algorithm->map, algorithm->session, data, size, reply);
+    NT_sendMidiSysEx(kNT_destinationUSB, reply, static_cast<uint32_t>(length), true);
 }
 constexpr _NT_factory makeFactory() {
     _NT_factory factory{};
@@ -69,6 +91,7 @@ constexpr _NT_factory makeFactory() {
     factory.tags = kNT_tagUtility;
     factory.serialise = serialise;
     factory.deserialise = deserialise;
+    factory.midiSysEx = midiSysEx;
     return factory;
 }
 constexpr auto pluginFactory = makeFactory();

@@ -20,7 +20,7 @@ is pinned at `9aeda6d41484815b80416b903a564510da6026cd` (API v13).
 The last callback formats numeric parameters; it is not an arbitrary writable
 string property. There is no factory callback for native string editing in
 this revision. Preset callbacks support custom state, and `midiSysEx` provides
-a potential custom transport, but its integration has not been designed here.
+the custom USB transport specified in [live-map-protocol.md](live-map-protocol.md).
 
 Helper has a built-in algorithm string-write path. Its bundled Lua controllers
 are pure projections of immutable slot snapshots and currently expose numeric
@@ -95,11 +95,9 @@ The native harness proves the callback payload, not that outer envelope.
 
 ## Next integration slices
 
-1. Specify and test a live state protocol: address the current slot safely,
-   identify schema/capabilities, protect against stale edits and preset swaps,
-   acknowledge writes, bound messages to Helper's 1024-byte SysEx limit, and
-   establish reconnect/error behavior. Verify firmware callback dispatch and
-   dirty/preset-save semantics on the device before declaring support.
+1. Verify the revision-2 USB bridge on hardware: callback dispatch, USB reply
+   delivery, preset replacement, and dirty/preset-save semantics. Automated
+   tests cover wire compatibility, conflicts, and interrupted transfers.
 2. Implement the NT text-entry workflow against real API capabilities; expose
    title/destination/metadata edits and retain native preset ownership.
 3. Add Helper state snapshots and host-owned declarative write actions, then
