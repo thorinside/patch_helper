@@ -1,0 +1,111 @@
+# Development contract
+
+## Source and scope
+
+Started from Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`,
+**Disting NT physical connection map and Helper companion interface**.
+The user authorized beginning development in this repository and supporting
+work in `../nt_helper` on 2026-09-27. The spec remains an unapproved discovery
+draft; this slice does not imply that its remaining decisions are settled.
+
+This first slice proves a preset-data boundary: native socket inventory,
+validation, atomic decoding, serialization, an NT display, and matching Helper
+code. It does not yet provide an end-to-end patch editing workflow.
+
+## Verified API findings
+
+The official [distingNT_API](https://github.com/expertsleepersltd/distingNT_API)
+is pinned at `9aeda6d41484815b80416b903a564510da6026cd` (API v13).
+`_NT_factory` exposes `serialise`, `deserialise`, and `parameterString`.
+The last callback formats numeric parameters; it is not an arbitrary writable
+string property. There is no factory callback for native string editing in
+this revision. Preset callbacks support custom state, and `midiSysEx` provides
+a potential custom transport, but its integration has not been designed here.
+
+Helper has a built-in algorithm string-write path. Its bundled Lua controllers
+are pure projections of immutable slot snapshots and currently expose numeric
+controls. Neither fact demonstrates arbitrary plug-in string writes or shared
+state. Do not add a string widget and claim it solves this limitation.
+
+## Prototype decisions
+
+- Provisional algorithm GUID: `ThPh`. No collision found in the inspected local
+  plugin sources or Helper algorithm metadata. Check the community index before
+  first release; preserve the GUID after release.
+- Custom slot member: `patch_helper`, version 1. See the shared fixture.
+- Twenty native sockets, IDs 0–11 for inputs 1–12, 12–19 for outputs 1–8.
+  The array must contain each ID exactly once, in any input order. Writers
+  normalize it into socket order. No auxiliary bus is a physical socket.
+- Required map fields: `version`, `title`, `connections`. Required connection
+  fields: `socket`, `destination`, `colour`, `tag`, `group`.
+- Colour IDs 0–11: None, Black, White, Grey, Red, Orange, Yellow, Green, Blue,
+  Purple, Pink, Brown. Tag 0 means absent; 1–12 are the optional visible tags.
+- Title/destination buffers are 64 bytes including terminator, aligned with
+  the API's 64-byte display-string boundary. Group buffers are 32 bytes.
+  Printable ASCII only in this preview; these are explicit prototype memory
+  and display choices, not claimed firmware text limits. Revisit before UI
+  design and release. Both implementations reject unsupported input.
+- Empty destination means unused; metadata remains intact. Groups are stored
+  without providing grouping UI yet. The palette and retention policy remain
+  reviewable development defaults, not owner-approved spec decisions.
+- Missing custom state initializes a default map. Malformed present state,
+  unknown versions/fields, and duplicate sockets fail closed. Decode into a
+  candidate first, so failure cannot partially replace a valid map. Unrelated
+  firmware-owned slot properties are skipped/preserved.
+- All persistent state is per-instance SRAM requested from the host. Audio
+  processing is an empty callback. No global mutable map, routing parameters,
+  filesystem I/O, or audio-thread allocation exists.
+
+## Build and verification
+
+Requirements: ARM GCC, Python 3, a C++17 native compiler, and nlohmann/json
+headers for native tests only (`brew install nlohmann-json`, or your platform
+equivalent). No JSON library is linked into the ARM object.
+
+```sh
+git submodule update --init
+make verify
+# Override header location on other systems:
+make test JSON_INCLUDE=/usr/include
+```
+
+Native tests use AddressSanitizer/UndefinedBehaviorSanitizer and a desktop
+adapter for the firmware JSON cursor API. They exercise the actual factory
+callbacks, malformed-state rejection and atomicity, fixture round trips,
+socket identity, display bounds, and unchanged audio/CV buffers. The adapter
+does not prove firmware parser or physical preset lifecycle behavior.
+
+`make inspect` verifies ELF32 little-endian ARM relocatable output, exported
+`pluginEntry`, and an allowlist of runtime and pinned API imports. Section
+sizes and demangled imports are printed for review. `step` does no work;
+deserialization uses a temporary map on the control-side stack (about 2 KiB).
+`make static-check` runs cppcheck. It suppresses only two warning categories
+in the unmodified upstream headers: host-owned aggregate members without a
+constructor, and the upstream private non-explicit JSON-stream constructor.
+Plugin warnings remain errors. No production release is created by CI.
+
+The fixture is also stored in nt_helper at
+`test/fixtures/patch_map/native-map.json`. Keep both copies identical when the
+format changes. Helper's `PatchMapPresetCodec` accepts one full slot object;
+it validates GUID `ThPh` and preserves the rest of that slot on writes.
+
+## Next integration slices
+
+1. Specify and test a live state protocol: address the current slot safely,
+   identify schema/capabilities, protect against stale edits and preset swaps,
+   acknowledge writes, bound messages to Helper's 1024-byte SysEx limit, and
+   establish reconnect/error behavior. Verify firmware callback dispatch and
+   dirty/preset-save semantics on the device before declaring support.
+2. Implement the NT text-entry workflow against real API capabilities; expose
+   title/destination/metadata edits and retain native preset ownership.
+3. Add Helper state snapshots and host-owned declarative write actions, then
+   the connection-map editor (gear/socket views). Avoid embedding raw MIDI or
+   a mutable second state store in Lua.
+4. Resolve expander models/topology, naming, limits, sorting, grouping UI, and
+   ordinary versus end-of-chain preset behavior with the owner.
+5. Treat SD-card companion discovery/execution as a separate framework slice:
+   manifest/version compatibility, trust, isolated execution budgets, loading,
+   removal, and failure fallback. Existing bundled controllers do not provide
+   a sandbox for arbitrary downloaded Lua.
+
+No production tag, device deployment, or Substrate approval has been performed.
