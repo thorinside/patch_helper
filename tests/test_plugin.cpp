@@ -1,7 +1,11 @@
+#include <cstddef>
 #define _DISTINGNT_SERIALISATION_INTERNAL
 #include <distingnt/api.h>
 #include <distingnt/serialisation.h>
+#define _DISTINGNT_SLOT_INTERNAL
+#include <distingnt/slot.h>
 #include "patch_map.h"
+#include "patch_protocol.h"
 #include "json_adapter.h"
 #include <cassert>
 #include <charconv>
@@ -39,7 +43,60 @@ int NT_intToString(char* output, int32_t value) {
     return static_cast<int>(length);
 }
 
+_NT_algorithm* activeAlgorithm = nullptr;
+std::vector<uint8_t> midiReply;
+bool NT_getSlot(_NT_slot& slot, uint32_t index) { slot.refCon = activeAlgorithm; return index == 0; }
+uint32_t _NT_slot::guid() const { return NT_MULTICHAR('T', 'h', 'P', 'h'); }
+_NT_algorithm* _NT_slot::plugin() const { return static_cast<_NT_algorithm*>(refCon); }
+void NT_sendMidiSysEx(uint32_t destination, const uint8_t* data, uint32_t size, bool end) {
+    assert(destination == kNT_destinationUSB && end);
+    midiReply.assign(data, data + size);
+}
+
+void testProtocolBounds() {
+    using namespace patch_helper;
+    PatchMap map;
+    Session session{43, 0};
+    uint8_t reply[128]{};
+    std::vector<uint8_t> request(20, 0);
+    std::copy(std::begin(kPrefix), std::end(kPrefix), request.begin());
+    request[6] = 4; request[12] = 43;
+    request.push_back(63); request.insert(request.end(), 63, 'T');
+    assert(isRequest(request.data(), request.size()));
+    assert(respond(map, session, request.data(), request.size(), reply) == 21);
+    assert(reply[20] == 0 && std::strlen(map.title) == 63);
+    request.resize(20); request[6] = 3; request[16] = 1;
+    request.insert(request.end(), {19, 11, 12, 63});
+    request.insert(request.end(), 63, 'D'); request.push_back(31);
+    request.insert(request.end(), 31, 'G');
+    const auto original = map;
+    for (std::size_t size = 20; size < request.size(); ++size) {
+        assert(isRequest(request.data(), size));
+        respond(map, session, request.data(), size, reply);
+        assert(reply[20] == 1 && session.revision == 1);
+        assert(std::memcmp(&map, &original, sizeof(map)) == 0);
+    }
+    respond(map, session, request.data(), request.size(), reply);
+    assert(reply[20] == 0 && session.revision == 2);
+    request.resize(21); request[6] = 2; request[16] = 2; request[20] = 19;
+    assert(respond(map, session, request.data(), request.size(), reply) == 120);
+    assert(reply[20] == 0 && reply[21] == 19 && reply[22] == 11 && reply[23] == 12);
+    session.revision = kMaxWireInteger;
+    request.resize(20); request[6] = 4;
+    writeInteger(request.data() + 16, kMaxWireInteger);
+    request.push_back(0);
+    respond(map, session, request.data(), request.size(), reply);
+    assert(reply[20] == 2 && std::strlen(map.title) == 63);
+    request.resize(20); request[6] = 1;
+    respond(map, session, request.data(), request.size(), reply);
+    assert(reply[20] == 1); // A wrap must never retain the old lease.
+    request[12] = 44;
+    respond(map, session, request.data(), request.size(), reply);
+    assert(reply[20] == 0 && session.revision == 0 && session.lease == 44);
+}
+
 int main(int argc, char** argv) {
+    testProtocolBounds();
     assert(argc == 2);
     std::ifstream input(argv[1]);
     const auto fixture = Json::parse(input);
@@ -54,6 +111,7 @@ int main(int argc, char** argv) {
     std::vector<std::max_align_t> memory((req.sram + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t));
     _NT_algorithmMemoryPtrs ptrs{reinterpret_cast<uint8_t*>(memory.data()), nullptr, nullptr, nullptr};
     auto* algorithm = factory->construct(ptrs, req, nullptr);
+    activeAlgorithm = algorithm;
     int16_t page = 1;
     algorithm->v = &page;
     const auto load = [&](const Json& json) {
@@ -64,6 +122,38 @@ int main(int argc, char** argv) {
         JsonWriter writer; _NT_jsonStream stream(&writer);
         factory->serialise(algorithm, stream); return writer.value;
     };
+    std::ifstream wireInput("tests/fixtures/midi-session.json");
+    const auto frames = Json::parse(wireInput);
+    for (const auto& frame : frames) {
+        const auto inputBytes = frame["request"].get<std::vector<uint8_t>>();
+        const auto expectedBytes = frame["response"].get<std::vector<uint8_t>>();
+        factory->midiSysEx(inputBytes.data(), inputBytes.size());
+        assert(std::vector<uint8_t>(expectedBytes.begin() + 1, expectedBytes.end() - 1) == midiReply);
+    }
+    assert(load(Json::object()));
+    // Exercise the real factory MIDI callback, including malformed and stale writes.
+    std::vector<uint8_t> request(20, 0);
+    std::copy(std::begin(patch_helper::kPrefix), std::end(patch_helper::kPrefix), request.begin());
+    request[6] = 1; request[8] = 9; request[12] = 42;
+    factory->midiSysEx(request.data(), request.size());
+    assert(midiReply[6] == 0x41 && midiReply[20] == 0 && midiReply[21] == 12);
+    request[6] = 3;
+    request.insert(request.end(), {0, 4, 7, 4, 'E', 'c', 'h', 'o', 0});
+    factory->midiSysEx(request.data(), request.size());
+    assert(midiReply[20] == 0 && patch_helper::readInteger(midiReply.data() + 16) == 1);
+    assert(save()["patch_helper"]["connections"][0]["destination"] == "Echo");
+    factory->midiSysEx(request.data(), request.size());
+    assert(midiReply[20] == 3); // Duplicate or delayed writes cannot apply twice.
+    request[16] = 1; request[12] = 43;
+    factory->midiSysEx(request.data(), request.size()); assert(midiReply[20] == 2);
+    request[12] = 42; request.back() = 32;
+    factory->midiSysEx(request.data(), request.size()); assert(midiReply[20] == 1);
+    assert(save()["patch_helper"]["connections"][0]["destination"] == "Echo");
+    assert(load(Json::object())); // Preset replacement invalidates an old editor.
+    request.back() = 0; request[16] = 0;
+    factory->midiSysEx(request.data(), request.size()); assert(midiReply[20] == 2);
+    request[0] = 0x7e; midiReply.clear();
+    factory->midiSysEx(request.data(), request.size()); assert(midiReply.empty());
     const auto defaults = save();
     assert(defaults["patch_helper"]["connections"].size() == 20);
     assert(load(fixture));
