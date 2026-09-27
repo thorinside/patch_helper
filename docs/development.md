@@ -65,8 +65,8 @@ equivalent). No JSON library is linked into the ARM object.
 ```sh
 git submodule update --init
 make verify
-# Override header location on other systems:
-make test JSON_INCLUDE=/usr/include
+# Override only when headers are outside the compiler's normal search path:
+make test JSON_INCLUDE=/custom/include
 ```
 
 Native tests use AddressSanitizer/UndefinedBehaviorSanitizer and a desktop
