@@ -271,3 +271,35 @@ The corrected object has SHA-256 `100ccd085f866e0a5c5a6066bb85f2d56b38550b7c1116
 `/presets/PH 0928 112251.json`; SD object readback and preset restoration succeeded.
 Native sanitizer, static analysis, ARM inspection and two-address strict-alignment
 startup checks passed again.
+
+
+## Explicit custom controls (2026-09-28)
+
+The owner replaced the partial override design with explicit channel/field/value
+controls. Pot 1 and encoder 1 select a socket, pot 2 selects colour/tag, and pot 3
+or encoder 2 changes its value. Pressing and turning encoder 1 scrolls the filtered
+list without editing. This supersedes the button 1/4 mapping above.
+
+The pinned C++ API can retain the firmware row through `draw() == false`, but
+exposes no native focus setter. A temporary `ThRd` hardware diagnostic called
+`NT_setParameterFromUi()` to change Tag to 7 while Cable colour was focused.
+Parameter readback contained Tag 7, but the screen still showed Cable colour.
+The production custom view therefore renders its own matching control strip
+and returns true; the regular four-field parameter pages remain unchanged.
+The diagnostic preset was temporary and the working preset was restored.
+
+UI edits use `NT_setParameterFromUi()` with `NT_parameterOffset()`; the normal
+parameter callback updates persistent map records and revisions. Selecting and
+scrolling remain local view state. Pot 3 has pickup after selection or remote/
+encoder edits. Non-finite pot positions are ignored; values and channel bounds
+are clamped. Native tests cover these cases, all three pots, both encoders,
+legacy high-bank writes, modifier isolation and setupUi targets.
+
+Native ASan/UBSan tests, cppcheck, ARM import/PIC inspection and strict-alignment
+startup at two load addresses passed. The uploaded object was read back exactly:
+SHA-256 `a6dfa137f5fb1912848e5d0360ea719a52cfaa98ce8e1a895f1125c1ad54902e`.
+A fresh backup `/presets/PH 0928 113117.json` was restored as Patch Pages Test.
+The hardware screen below verifies layout and successful loading, not physical
+control feel; that remains owner acceptance.
+
+![Custom controls above connected sockets](evidence/native-custom-controls.png)

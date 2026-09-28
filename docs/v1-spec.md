@@ -152,20 +152,36 @@ V1 acceptance requirement. Native expander names are displayed on the bank page.
 
 ## NT connected-socket view
 
-The custom NT view leaves the native parameter row visible and reserves the top
-12 pixels for it. Up to four connected sockets are drawn below it, at text
-baselines 21, 34, 47 and 60. Each shows socket label, colour and destination.
-A nonempty destination defines a connected socket; unused rows are omitted even
-if they retain a colour or tag. An empty map leaves the list area blank.
+The custom NT view renders a channel / parameter / value control strip in the
+first 12 pixels. This replaces the firmware row only in the custom algorithm
+view; normal native parameter pages remain available. The C++ API can retain
+the firmware row with `draw() == false`, but does not expose a focus setter.
+A device probe confirmed `NT_setParameterFromUi()` changes the requested value
+without moving native focus, so retaining that row would misrepresent selection.
 
-Only buttons 1 and 4 are overridden: button 1 scrolls up and button 4 scrolls
-down, one connected row per new press. Holding a button does not repeat. Pressing
-both together makes no change. Clamp at each end so the last window stays filled
-when at least four records exist. Both encoders and all other controls remain
-firmware-owned, preserving native parameter editing. The first visible socket anchors
-the viewport across map updates, clamped when rows disappear. Scrolling changes
-only local view state, not native parameter values, map content or revision.
-All sockets remain available in the native pages and Helper table for editing.
+Pot 1 and encoder 1 turn select any configured socket in physical order. Pot 2
+selects the editable Cable colour or Tag field; the read-only text fields remain
+on the normal parameter pages. Pot 3 and encoder 2 turn edit the selected value.
+Use the SDK UI setter with the common-parameter offset and existing numeric
+indices, so native edits persist and synchronize with Helper through the normal
+map revision path. Values and selections clamp at their bounds. Pot positions
+initialize through `setupUi`; pot 3 uses pickup after selection, encoder or
+remote changes to prevent jumping to an unrelated physical knob position.
+
+Holding encoder 1 while turning scrolls the connected list, one row per detent.
+While held, other edit inputs are ignored: scrolling changes no selected socket,
+field, parameter value, map content or revision. The previous button 1/4 scroll
+mapping is removed. Only the three pots, two encoder turns and encoder 1 press
+are claimed; other buttons remain firmware-owned.
+
+Up to four connected sockets appear at baselines 21, 34, 47 and 60, showing
+socket label, colour and destination. Nonempty destination defines connected;
+unused rows are omitted even if they retain colour or tag. Empty maps show only
+the top control strip. Scrolling is bounded and retains a filled last window
+when at least four rows exist. Socket selection brings that connection into view;
+manual scroll is otherwise independent. The first visible socket anchors the
+viewport across map updates and clamps when records disappear. All sockets
+remain available in the native pages and Helper table for editing.
 
 ## Synchronization and Lua events
 
@@ -234,11 +250,11 @@ constraint, not a timeless SDK guarantee.
 
 The revised four-field layout was exercised on the device for Input 1 and E8
 Out 1 using an eight-bank test map; the working preset was restored afterward.
-The connected-list screen clears the native top row. The owner found that
-claiming the right encoder blocked native parameter editing; that approach was
-removed in favor of buttons 1 and 4. Button scrolling, filtering, bounds and
-unchanged map/revision are covered by native callback tests; physical button
-operation remains an owner acceptance check.
+The connected-list screen clears the top control strip. The owner reported that
+partial custom-control overrides interfered with native editing; the final
+control design explicitly owns channel, parameter and value navigation. Callback
+tests cover the pots, encoders, pickup, scrolling, bounds and unchanged state
+while scrolling. Physical control feel remains an owner acceptance check.
 
 The action dialog is covered by Flutter tests for all four choices, cancel and
 Escape, bank limits, invalid Lua schemas, stale actions and stable geometry.

@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <limits>
 
 _NT_jsonStream::_NT_jsonStream(void* value) : refCon(value) {}
 _NT_jsonStream::~_NT_jsonStream() = default;
@@ -33,9 +34,14 @@ bool _NT_jsonParse::number(int& value) { return static_cast<JsonReader*>(refCon)
 bool _NT_jsonParse::string(const char*& value) { return static_cast<JsonReader*>(refCon)->string(value); }
 
 std::vector<std::string> drawn;
+std::vector<std::string> headerDrawn;
 void NT_drawText(int, int y, const char* text, int, _NT_textAlignment, _NT_textSize) {
-    assert(y >= 21 && y <= 60); // Leave the firmware-owned top row clear.
+    if (y == 9) { headerDrawn.emplace_back(text); return; }
+    assert(y >= 21 && y <= 60); // Keep list text below the control row.
     drawn.emplace_back(text);
+}
+void NT_drawShapeI(_NT_shape shape, int x0, int y0, int x1, int y1, int) {
+    assert(shape == kNT_rectangle && x0 == 0 && y0 == 0 && x1 == 255 && y1 == 11);
 }
 int NT_intToString(char* output, int32_t value) {
     char text[12];
@@ -139,6 +145,10 @@ void NT_setParameterFromAudio(uint32_t index, uint32_t p, int16_t value) {
     const_cast<int16_t*>(activeAlgorithm->v)[p - 7] = value;
     const auto* f = reinterpret_cast<const _NT_factory*>(pluginEntry(kNT_selector_factoryInfo, 0));
     f->parameterChanged(activeAlgorithm, p - 7);
+}
+
+void NT_setParameterFromUi(uint32_t index, uint32_t p, int16_t value) {
+    NT_setParameterFromAudio(index, p, value);
 }
 
 void testEditableTextLimits() {
@@ -452,25 +462,21 @@ int main(int argc, char** argv) {
     factory->draw(algorithm);
     assert(drawn[0] == "In 1");
     // Connected-only viewport crosses input/output/expander gaps and is local UI state.
-    assert(factory->hasCustomUi(algorithm) == (kNT_button1 | kNT_button4));
+    assert(factory->hasCustomUi(algorithm) == (kNT_potL | kNT_potC | kNT_potR | kNT_encoderL | kNT_encoderR | kNT_encoderButtonL));
     auto scrollMap = expanded;
     for (auto& row : scrollMap["patch_helper"]["connections"]) row["destination"] = "";
     for (int socket : {0, 5, 12, 20, 76, 83})
         scrollMap["patch_helper"]["connections"][socket]["destination"] = "Connected";
     assert(load(scrollMap)); factory->step(algorithm, nullptr, 0);
     const auto labels = [&]() {
-        drawn.clear(); assert(!factory->draw(algorithm)); // Firmware draws its parameter row.
+        drawn.clear(); assert(factory->draw(algorithm)); // Custom controls own the matching top row.
         std::vector<std::string> result;
         for (std::size_t i = 0; i < drawn.size(); i += 3) result.push_back(drawn[i]);
         return result;
     };
-    const auto press = [&](uint16_t controls, uint16_t last = 0) {
-        _NT_uiData ui{}; ui.controls = controls; ui.lastButtons = last;
-        factory->customUi(algorithm, ui);
-    };
     const auto scroll = [&](int rows) {
-        for (int i = 0; i < std::abs(rows); ++i)
-            press(rows < 0 ? kNT_button1 : kNT_button4);
+        _NT_uiData ui{}; ui.controls = kNT_encoderButtonL; ui.encoders[0] = rows;
+        factory->customUi(algorithm, ui);
     };
     scroll(-128);
     assert((labels() == std::vector<std::string>{"In 1", "In 6", "Out 1", "E1:1"}));
@@ -482,12 +488,11 @@ int main(int argc, char** argv) {
     request[6] = 1; request[12] = 45; request[20] = 2;
     factory->midiSysEx(request.data(), request.size());
     const auto beforeRevision = patch_helper::readInteger(midiReply.data() + 16);
-    _NT_uiData encoders{};
-    encoders.encoders[0] = 1; encoders.encoders[1] = 1;
-    factory->customUi(algorithm, encoders);
-    press(kNT_button4, kNT_button4); // Held buttons do not repeat every callback.
-    press(kNT_button1 | kNT_button4); // Opposing fresh presses cancel.
-    press(kNT_button2 | kNT_button3); // Other buttons retain firmware behavior.
+    _NT_uiData held{};
+    held.controls = kNT_encoderButtonL | kNT_potL | kNT_potC | kNT_potR;
+    held.pots[0] = held.pots[1] = held.pots[2] = 1.0f;
+    held.encoders[1] = 1;
+    factory->customUi(algorithm, held); // Modifier isolates scrolling from edits.
     assert(labels().front() == "In 1");
     scroll(1);
     assert((labels() == std::vector<std::string>{"In 6", "Out 1", "E1:1", "E8:1"}));
@@ -511,6 +516,53 @@ int main(int argc, char** argv) {
     scrollMap["patch_helper"]["connections"][83]["destination"] = "Only";
     assert(load(scrollMap)); assert((labels() == std::vector<std::string>{"E8:8"}));
     assert(load(fixture)); scroll(-128);
+    // Three pots and two encoders edit the displayed channel without UI focus APIs.
+    assert(load(scrollMap));
+    const auto sendUi = [&](int left, int right, uint16_t controls = 0,
+                            float p1 = 0, float p2 = 0, float p3 = 0) {
+        _NT_uiData ui{}; ui.controls = controls; ui.encoders[0] = left; ui.encoders[1] = right;
+        ui.pots[0] = p1; ui.pots[1] = p2; ui.pots[2] = p3;
+        factory->customUi(algorithm, ui);
+    };
+    const auto header = [&]() {
+        headerDrawn.clear(); factory->draw(algorithm); return headerDrawn;
+    };
+    _NT_float3 potTargets{}; factory->setupUi(algorithm, potTargets);
+    assert(potTargets[0] == 0 && potTargets[1] == 0);
+    auto unchanged = save();
+    sendUi(1, 0);
+    assert(header()[0] == "Input 2" && save() == unchanged);
+    sendUi(-128, 0); assert(header()[0] == "Input 1");
+    sendUi(127, 0); assert(header()[0] == "E13 Out 8");
+    sendUi(1, 0); assert(header()[0] == "E13 Out 8");
+    sendUi(0, 0, kNT_potC, 0, 1, 1); // Select tag; do not write the stale value pot.
+    assert(header()[1] == "Tag" && save() == unchanged);
+    sendUi(0, 1); assert(save()["patch_helper"]["connections"][123]["tag"] == 1);
+    sendUi(0, 127); assert(header()[2] == "12");
+    sendUi(0, -128); assert(header()[2] == "-");
+    sendUi(0, 0, kNT_potL | kNT_potC | kNT_potR, 76.0f / 123, 0, 1);
+    assert(header()[0] == "E8 Out 1" && header()[1] == "Cable colour");
+    int oldColour = save()["patch_helper"]["connections"][76]["colour"];
+    sendUi(0, 1);
+    assert(save()["patch_helper"]["connections"][76]["colour"] == oldColour + 1);
+    // Endpoint selection, NaN guards, pickup after a field change and remote edit.
+    sendUi(0, 0, kNT_potL | kNT_potC, 0, 1, 1);
+    assert(header()[0] == "Input 1" && header()[1] == "Tag");
+    unchanged = save();
+    sendUi(0, 0, kNT_potR, 0, 0, .9f); assert(save() == unchanged);
+    sendUi(0, 0, kNT_potR, 0, 0, 0);
+    sendUi(0, 0, kNT_potR, 0, 0, .5f); assert(header()[2] == "6");
+    values[4] = 12; factory->parameterChanged(algorithm, 4);
+    sendUi(0, 0, kNT_potR, 0, 0, .6f); assert(header()[2] == "12");
+    sendUi(0, 0, kNT_potR, 0, 0, 1);
+    sendUi(0, 0, kNT_potR, 0, 0, .5f); assert(header()[2] == "6");
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    unchanged = save(); sendUi(0, 0, kNT_potL | kNT_potC | kNT_potR, nan, nan, nan);
+    assert(save() == unchanged && header()[0] == "Input 1");
+    factory->setupUi(algorithm, potTargets);
+    assert(potTargets[0] == 0 && potTargets[1] == 1 && potTargets[2] == .5f);
+    assert(load(fixture));
+    sendUi(0, 0, kNT_potL | kNT_potC, 0, 0, 0);
     const auto saved = save();
     const auto reject = [&](Json json) { assert(!load(json)); assert(save() == saved); };
     auto broken = fixture; broken["patch_helper"]["version"] = 2; reject(broken);
@@ -540,7 +592,7 @@ int main(int argc, char** argv) {
         factory->step(algorithm, buses.data(), frames); assert(buses == before);
     }
     for (int16_t value : {int16_t(-32768), int16_t(1), int16_t(20), int16_t(32767)}) {
-        page = value; assert(!factory->draw(algorithm));
+        page = value; assert(factory->draw(algorithm));
     }
     patch_helper::Connection connection;
     connection.colour = 4; connection.tag = 12;

@@ -23,11 +23,23 @@ Older maps with more than eight banks retain all their records and can use
 **Other sockets** on the NT. Numeric mappings through bank eight remain stable;
 old mappings for higher banks need reassignment to the compatibility controls.
 
-The custom NT view keeps the native parameter row at the top and shows up to
-four connected sockets below it. Press **button 1** to scroll up or **button 4** to scroll down. Both encoders
-remain available to the native parameter editor.
-Sockets with a blank destination are omitted here; every socket remains available
+The custom NT view has a compact channel / parameter / value row at the top,
+with up to four connected sockets below it. Its controls are:
+
+| Control | Action |
+| --- | --- |
+| Pot 1 or encoder 1 turn | Select a socket/channel |
+| Pot 2 | Select Cable colour or Tag |
+| Pot 3 or encoder 2 turn | Edit that value |
+| Hold encoder 1 and turn it | Scroll the connected list without editing |
+
+All configured sockets can be selected, including unused ones. Text fields remain
+read-only on the NT and are visible on the normal parameter pages. Pot 3 uses
+pickup after selection changes or encoder/remote edits to avoid accidental jumps.
+Sockets with a blank destination are omitted from the list; all sockets remain
 in the parameter pages and Helper table. Scrolling does not change the patch.
+The custom top row replaces the firmware row only in the algorithm display;
+normal native parameter pages are retained.
 
 ## Development preview
 

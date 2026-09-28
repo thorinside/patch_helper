@@ -2,6 +2,7 @@
 #error "The NT hardware build requires -fPIC"
 #endif
 #include <cstddef>
+#include <cmath>
 #include <distingnt/api.h>
 #include <distingnt/serialisation.h>
 #include <distingnt/slot.h>
@@ -37,6 +38,11 @@ struct Algorithm : _NT_algorithm {
     bool needsProjection = true;
     bool needsGray = true;
     int firstVisibleSocket = 0;
+    int uiSocket = 0;
+    int uiField = 0; // Editable fields: cable colour, tag. Text is read-only.
+    int uiKnownValue = -1;
+    float uiLastValuePot = 0.0f;
+    bool uiValuePickup = true;
     int configuredBank = -1;
     int configuredExpanders = -1;
 };
@@ -237,18 +243,98 @@ int connectedWindow(Algorithm& algorithm, std::array<int, patch_helper::kMaxSock
     algorithm.firstVisibleSocket = count ? sockets[first] : 0;
     return first;
 }
-uint32_t hasCustomUi(_NT_algorithm*) { return kNT_button1 | kNT_button4; }
+int uiValue(const Algorithm& algorithm) {
+    const auto& row = algorithm.map.connections[std::clamp(algorithm.uiSocket, 0, algorithm.map.socketCount() - 1)];
+    return algorithm.uiField ? row.tag : row.colour;
+}
+int uiMaximum(const Algorithm& algorithm) { return algorithm.uiField ? 12 : patch_helper::kColourCount - 1; }
+uint32_t hasCustomUi(_NT_algorithm*) {
+    return kNT_potL | kNT_potC | kNT_potR | kNT_encoderL | kNT_encoderR | kNT_encoderButtonL;
+}
+void setupUi(_NT_algorithm* self, _NT_float3& pots) {
+    auto& a = *static_cast<Algorithm*>(self);
+    a.uiSocket = std::clamp(a.uiSocket, 0, a.map.socketCount() - 1);
+    pots[0] = float(a.uiSocket) / (a.map.socketCount() - 1);
+    pots[1] = float(a.uiField);
+    pots[2] = float(uiValue(a)) / uiMaximum(a);
+    a.uiLastValuePot = pots[2];
+    a.uiKnownValue = uiValue(a);
+    a.uiValuePickup = false; // Host soft takeover is initialized by setupUi().
+}
+int potIndex(float position, int maximum) {
+    return int(std::clamp(position, 0.0f, 1.0f) * maximum + 0.5f);
+}
 void customUi(_NT_algorithm* self, const _NT_uiData& data) {
-    const auto pressed = data.controls & ~data.lastButtons;
-    const int delta = ((pressed & kNT_button4) ? 1 : 0) - ((pressed & kNT_button1) ? 1 : 0);
-    if (!delta) return;
-    auto& algorithm = *static_cast<Algorithm*>(self);
+    auto& a = *static_cast<Algorithm*>(self);
     std::array<int, patch_helper::kMaxSockets> sockets{};
     int count;
-    connectedWindow(algorithm, sockets, count, delta);
+    if (data.controls & kNT_encoderButtonL) {
+        connectedWindow(a, sockets, count, data.encoders[0]);
+        // Scrolling never selects a channel or edits a cable, even if a pot moves.
+        if (std::isfinite(data.pots[2])) a.uiLastValuePot = data.pots[2];
+        a.uiValuePickup = true;
+        return;
+    }
+    const int previousSocket = a.uiSocket;
+    const int previousField = a.uiField;
+    a.uiSocket = std::clamp(a.uiSocket, 0, a.map.socketCount() - 1);
+    if ((data.controls & kNT_potL) && std::isfinite(data.pots[0]))
+        a.uiSocket = potIndex(data.pots[0], a.map.socketCount() - 1);
+    a.uiSocket = std::clamp(a.uiSocket + data.encoders[0], 0, a.map.socketCount() - 1);
+    if ((data.controls & kNT_potC) && std::isfinite(data.pots[1])) a.uiField = potIndex(data.pots[1], 1);
+    const bool selectionChanged = a.uiSocket != previousSocket || a.uiField != previousField;
+    if (a.uiSocket != previousSocket) {
+        const int first = connectedWindow(a, sockets, count);
+        for (int i = 0; i < count; ++i) {
+            if (sockets[i] != a.uiSocket) continue;
+            if (i < first) connectedWindow(a, sockets, count, i - first);
+            else if (i >= first + 4) connectedWindow(a, sockets, count, i - first - 3);
+            break;
+        }
+    }
+    int value = uiValue(a);
+    const int maximum = uiMaximum(a);
+    if (selectionChanged || a.uiKnownValue != value) a.uiValuePickup = true;
+    if (selectionChanged && std::isfinite(data.pots[2])) a.uiLastValuePot = data.pots[2];
+    if (!selectionChanged && (data.controls & kNT_potR) && std::isfinite(data.pots[2])) {
+        const float position = std::clamp(data.pots[2], 0.0f, 1.0f);
+        const float target = float(value) / maximum;
+        if (potIndex(position, maximum) == value ||
+            (a.uiLastValuePot <= target && position >= target) ||
+            (a.uiLastValuePot >= target && position <= target)) a.uiValuePickup = false;
+        if (!a.uiValuePickup) value = potIndex(position, maximum);
+        a.uiLastValuePot = position;
+    }
+    if (data.encoders[1]) {
+        value = std::clamp(value + data.encoders[1], 0, maximum);
+        a.uiValuePickup = true;
+    }
+    a.uiKnownValue = value;
+    if (!self->v || value == uiValue(a)) return;
+    const auto index = NT_algorithmIndex(self);
+    const auto offset = NT_parameterOffset();
+    if (a.uiSocket < patch_helper::kNativeSockets) {
+        NT_setParameterFromUi(index, offset + kLegacyParameters + 2 * a.uiSocket + a.uiField, value);
+    } else {
+        // Legacy larger maps retain editable numeric fields via the old selector.
+        NT_setParameterFromUi(index, offset, a.uiSocket + 1);
+        NT_setParameterFromUi(index, offset + 1 + a.uiField, value);
+    }
 }
 bool draw(_NT_algorithm* self) {
     auto& algorithm = *static_cast<Algorithm*>(self);
+    algorithm.uiSocket = std::clamp(algorithm.uiSocket, 0, algorithm.map.socketCount() - 1);
+    char channel[16]{};
+    socketName(channel, algorithm.uiSocket);
+    char value[16]{};
+    if (algorithm.uiField) {
+        if (uiValue(algorithm)) NT_intToString(value, uiValue(algorithm));
+        else std::strcpy(value, "-");
+    } else std::strcpy(value, patch_helper::kColours[uiValue(algorithm)]);
+    NT_drawShapeI(kNT_rectangle, 0, 0, 255, 11, 2);
+    NT_drawText(1, 9, channel, 15, kNT_textLeft, kNT_textNormal);
+    NT_drawText(87, 9, algorithm.uiField ? "Tag" : "Cable colour", 15, kNT_textLeft, kNT_textNormal);
+    NT_drawText(174, 9, value, 15, kNT_textLeft, kNT_textNormal);
     std::array<int, patch_helper::kMaxSockets> sockets{};
     int count;
     const int first = connectedWindow(algorithm, sockets, count);
@@ -265,7 +351,7 @@ bool draw(_NT_algorithm* self) {
             NT_intToString(label + std::strlen(label), input ? socket + 1 : socket - 11);
         }
         const int y = 21 + row * 13;
-        NT_drawText(0, y, label, 15, kNT_textLeft, kNT_textTiny);
+        NT_drawText(0, y, label, socket == algorithm.uiSocket ? 15 : 8, kNT_textLeft, kNT_textTiny);
         NT_drawText(33, y, patch_helper::kColours[connection.colour], 15, kNT_textLeft, kNT_textTiny);
         // The complete destination remains in preset state; screen clipping is
         // presentation only. The tiny font fits 44 characters in this column.
@@ -273,7 +359,7 @@ bool draw(_NT_algorithm* self) {
         std::strncpy(destination, connection.destination, 44);
         NT_drawText(77, y, destination, 15, kNT_textLeft, kNT_textTiny);
     }
-    return false; // Keep the native parameter line visible above the rows.
+    return true; // The SDK cannot select native UI focus; render the matching control row.
 }
 int textSocket(const Algorithm& algorithm, int p) {
     if (p >= kLegacyText) return selectedSocket(algorithm);
@@ -347,6 +433,7 @@ constexpr _NT_factory makeFactory() {
     factory.draw = draw;
     factory.hasCustomUi = hasCustomUi;
     factory.customUi = customUi;
+    factory.setupUi = setupUi;
     factory.parameterUiPrefix = parameterUiPrefix;
     factory.parameterString = parameterString;
     factory.tags = kNT_tagUtility;
