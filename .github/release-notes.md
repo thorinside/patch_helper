@@ -1,10 +1,11 @@
-Development preview for testing Patch Helper and its NT Helper companion.
+Patch Helper records physical cable connections with your NT preset.
+This release includes its SD-card Lua companion for NT Helper 2.56.0 or newer.
 
 Record physical connections for 12 inputs, 8 outputs, and up to eight expander
 banks. Edit destination, cable colour, tag, and group in Helper. On the NT,
 view every field and edit colour/tag with the pots and encoders.
 
-Download **patch_helper-preview.zip** and copy its `programs` folder to the
+Download **patch_helper.zip** and copy its `programs` folder to the
 SD root. It includes both files:
 
 ```text
@@ -21,6 +22,8 @@ loading, native display, two-way edits, dynamic pages, and regular preset recall
 Other firmware and end-of-chain preset merging remain unverified. Text is
 read-only on the NT. Wait for sync before leaving Helper's editor, then save the
 NT preset to retain changes.
+
+The owner verified Gallery download and installation of both companion files.
 
 The release ZIP is built by CI after native sanitizer tests, static analysis,
 ARM object inspection, and emulated startup checks. Those checks do not replace

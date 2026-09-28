@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a fresh development ZIP with paths relative to the NT's SD root."""
+"""Build a fresh release ZIP with paths relative to the NT's SD root."""
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -14,7 +14,7 @@ for source in files.values():
     if not source.is_file() or source.stat().st_size == 0:
         raise SystemExit(f"Missing or empty package input: {source}")
 
-output = root / "build/patch_helper-preview.zip"
+output = root / "build/patch_helper.zip"
 output.parent.mkdir(parents=True, exist_ok=True)
 with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
     for destination, source in files.items():

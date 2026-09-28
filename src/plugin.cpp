@@ -432,7 +432,7 @@ constexpr _NT_factory makeFactory() {
     _NT_factory factory{};
     factory.guid = NT_MULTICHAR('T', 'h', 'P', 'h');
     factory.name = "Patch Helper";
-    factory.description = "Physical cable reference (development preview)";
+    factory.description = "Physical cable reference";
     factory.calculateRequirements = requirements;
     factory.construct = construct;
     factory.step = step;

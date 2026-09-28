@@ -5,14 +5,14 @@ is plugged into each socket, then look it up on the NT or edit it in NT Helper.
 Connections are entered manually; Patch Helper does not detect cables or change
 audio, CV, or routing.
 
-**Development preview.** Tested on disting NT firmware **1.19.0beta**. Other
+**Version 0.5.0.** Tested on disting NT firmware **1.19.0beta**. Other
 firmware versions have not been verified. The companion editor requires
 [NT Helper 2.56.0](https://github.com/No-Such-Device/nt_helper/releases/tag/v2.56.0)
 or newer.
 
 ## Install
 
-Download the plugin ZIP from [Releases](https://github.com/thorinside/patch_helper/releases).
+Download **patch_helper.zip** from [Releases](https://github.com/thorinside/patch_helper/releases/latest).
 Copy its `programs` folder to the root of the NT SD card, preserving these paths:
 
 ```text
@@ -78,7 +78,7 @@ The normal parameter pages show **Destination**, **Cable colour**, **Tag**, and
 Helper. Tag `0` means no tag. **Expander bank** selects which bank's eight socket
 pages are shown. Helper displays all banks together.
 
-## Preview limits
+## Compatibility and limits
 
 Regular preset save/recall has been checked on hardware. End-of-chain preset
 merging remains unverified. If the editor fails to load, check the Helper build

@@ -11,7 +11,8 @@ Started from Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`,
 The owner authorized development on 2026-09-27 and named the as-built baseline
 **V1** on 2026-09-28. [v1-spec.md](v1-spec.md) records the current scope and
 remaining acceptance work, including lifecycle acceptance. The original
-brainstorming capture remains in source-spec.md. V1 is not a production tag.
+brainstorming capture remains in source-spec.md. V1 is the product baseline;
+its first non-prerelease package is v0.5.0.
 
 The live workflow now includes preset serialization, SD companion loading/cache,
 automatic field reconciliation, the table/minimap, native colour/tag pages,
@@ -20,7 +21,7 @@ and dynamic page updates. See the V1 spec for measured hardware evidence.
 ## Packaging
 
 `make package` builds and inspects the ARM object, then creates
-`build/patch_helper-preview.zip` with exactly these files:
+`build/patch_helper.zip` with exactly these files:
 
 ```text
 programs/plug-ins/patch_helper.o
@@ -28,9 +29,10 @@ programs/helper/ThPh.lua
 README.md
 ```
 
-CI uses the same command. Tags matching `v*-preview.*` publish a GitHub
-prerelease only after verification succeeds, using that run's ZIP artifact.
-Production tags are not published by this workflow.
+CI uses the same command. Version tags (`vMAJOR.MINOR.PATCH`) publish a GitHub
+release only after verification succeeds, using that run's ZIP artifact.
+Tags with a prerelease suffix publish a prerelease instead. The release notes
+are maintained in `.github/release-notes.md`.
 Release ZIPs must retain both SD-relative paths;
 `programs/helper/ThPh.lua` is a companion dependency, not a Lua algorithm.
 The companion editor and Gallery installer support ship in
@@ -149,8 +151,8 @@ GOT elimination is a loader-compatibility hypothesis, not confirmed causation.
 `make static-check` runs cppcheck. It suppresses only two warning categories
 in the unmodified upstream headers: host-owned aggregate members without a
 constructor, and the upstream private non-explicit JSON-stream constructor.
-Plugin warnings remain errors. CI publishes only explicitly tagged development
-prereleases, never a production release.
+Plugin warnings remain errors. CI publishes releases only from explicit version
+tags after all verification steps pass.
 
 The fixture is also stored in nt_helper at
 `test/fixtures/patch_map/native-map.json`. Keep both copies identical when the
@@ -172,7 +174,8 @@ End-of-chain preset merging and preservation of pending field edits across
 editor/app disposal remain open. Gear sorting/group presentation and arbitrary
 GUID adapters are deferred. SD loading, caching, automatic field reconciliation,
 and regular preset recall now have implementation and test/device evidence.
-No production tag or Substrate readiness approval is implied by this baseline.
+The v0.5.0 release does not imply completion of these remaining items or a
+separate Substrate readiness approval.
 
 ## Editor revision supersedes the initial-slice limitations
 

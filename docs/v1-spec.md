@@ -6,8 +6,9 @@ This revision preserves that spec's identity and replaces its brainstorming
 requirements with the decisions made during development. The original capture
 is retained in [source-spec.md](source-spec.md).
 
-V1 names this product baseline; it does not create a production release or
-assert that the outstanding acceptance items below have passed.
+V1 names the product baseline packaged as v0.5.0, with companion and Gallery
+installation support released in NT Helper 2.56.0. The release does not assert
+that the outstanding acceptance items below have passed.
 
 ## Purpose and ownership
 
@@ -248,7 +249,7 @@ for packet layout. This is not a claim of registered production manufacturer ID.
 
 Lua evaluation runs in a fresh, disposable host isolate with a two-second deadline
 and 64 KiB source/result budgets. Dangerous standard globals are removed. These
-controls do not provide a hard memory quota against hostile Lua; this preview
+controls do not provide a hard memory quota against hostile Lua; this release
 assumes trusted SD companions.
 
 All plugin memory is declared in `calculateRequirements()` and constructed in
@@ -262,7 +263,9 @@ are supplied by the firmware.
 Built and exercised: preset-owned map, SD Lua loading/cache, table and minimap,
 all four expander models, naming/reordering, automatic field reconciliation,
 property-change callbacks, independent colour/tag pages and dynamic page updates.
-The owner reported the connected build working well on 2026-09-28.
+The owner reported the connected build working well on 2026-09-28, then
+confirmed Gallery submission, download, installation of both files, and
+successful use. NT Helper 2.56.0 ships the required companion support.
 
 Hardware evidence on v1.19.0beta (2026-09-16 build): native pages grew from 20 to
 28 after adding NTX-8CV; native colour/tag changes appeared in Helper; Helper
@@ -277,7 +280,8 @@ The connected-list screen clears the top control strip. The owner reported that
 partial custom-control overrides interfered with native editing; the final
 control design explicitly owns channel, parameter and value navigation. Callback
 tests cover the pots, encoders, pickup, selection visibility, unused-socket editing, single-line columns,
-ellipsis bounds and unchanged state while navigating. Physical control feel remains an owner acceptance check.
+ellipsis bounds and unchanged state while navigating. The owner accepted the
+final native display and controls after the channel-label brightness correction.
 
 The action dialog is covered by Flutter tests for all four choices, cancel and
 Escape, bank limits, invalid Lua schemas, stale actions and stable geometry.
@@ -289,7 +293,7 @@ acceptance. No hardware acceptance is inferred solely from those tests.
 
 Outstanding: end-of-chain
 preset merge/lifecycle behavior; persistence of pending edits across editor/app
-lifecycle changes; wider firmware acceptance and production release review.
+lifecycle changes; wider firmware acceptance.
 
 Deferred rather than silently claimed complete: gear-first presentation, sorting
 by gear/colour, group-based presentation, arbitrary GUID shared-state adapters,

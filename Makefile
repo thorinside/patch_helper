@@ -39,7 +39,7 @@ build/arm_startup.o: tests/arm_startup.cpp distingNT_API/include/distingnt/api.h
 arm-smoke: hardware build/arm_startup.o
 	python3 tools/arm_startup_check.py plugins/patch_helper.o build/arm_startup.o
 package: inspect
-	python3 tools/package_preview.py
+	python3 tools/package_release.py
 
 verify: test inspect arm-smoke
 static-check:
