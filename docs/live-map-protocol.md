@@ -86,3 +86,33 @@ The native object and tests establish a transport foundation. Helper's visible
 editor is the next part of revision 2; this document does not claim a completed
 editing UI. On-device text editing, expander topology, companion Lua loading,
 and physical-device acceptance remain separate work.
+
+## Editor-compatible extension (revision 3)
+
+The prefix remains protocol 1. Extended Open sends payload `02`; its reply is
+`title text, expander count`. Legacy empty Open still returns only title.
+Old binaries reject extended Open, so Helper reports that the plug-in needs
+updating rather than silently omitting expanders.
+
+Additional commands:
+
+| Command | Request | Reply data |
+|---|---|---|
+| 5 Add expander | type, name text | empty |
+| 6 Read expander | zero-based index | type, name text |
+| 7 Rename expander | index, name text | empty |
+| 8 Move expander | from index, to index | empty |
+
+Types 0–3 are NTX-8CV, ES-5, ESX-8GT, ESX-8CV. Names are at most 31 printable
+ASCII characters. Command 6 is a read; 5/7/8 increment revision once on success.
+A move shifts complete eight-socket banks and their metadata atomically. Native
+IDs stay 0–19; expander IDs follow in physical list order. Capacity is thirteen
+banks, derived from the 7-bit socket ID. Invalid payloads and overflow fail
+without mutation. Maximum frame size stays 122 bytes.
+
+Helper reads title/count, every expander, and every configured socket under one
+lease/revision before exposing a map. Preset version 2 requires an `expanders`
+array of `{type, name}` objects and exactly 20 + 8×count connection records.
+Version 1 remains readable and is still written for maps without expanders.
+The shared expanded-session fixture exercises Lua-dispatched edits against both
+Dart and the actual C++ factory, including rename, move and reload.

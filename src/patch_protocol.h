@@ -23,7 +23,7 @@ inline bool isRequest(const uint8_t* data, std::size_t size) {
     if (size < kHeaderBytes || size > 120 ||
         std::memcmp(data, kPrefix, sizeof(kPrefix)) != 0) return false;
     for (std::size_t i = 0; i < size; ++i) if (data[i] > 127) return false;
-    return data[6] >= 1 && data[6] <= 4;
+    return data[6] >= 1 && data[6] <= 8;
 }
 template <std::size_t N>
 bool readText(const uint8_t*& data, const uint8_t* end, char (&text)[N]) {
@@ -57,16 +57,21 @@ inline std::size_t respond(PatchMap& map, Session& session,
     const uint8_t* end = request + size;
     uint8_t* output = reply + kHeaderBytes + 1;
     if (command == 1) {
-        if (data != end || lease == 0 || lease == session.lease) status = Status::invalid;
+        const bool extended = end - data == 1 && *data == 2;
+        if ((data != end && !extended) || lease == 0 || lease == session.lease) status = Status::invalid;
         else {
             session.lease = lease;
             if (session.revision == kMaxWireInteger) session.revision = 0;
             writeText(output, map.title);
+            if (extended) {
+                *output++ = static_cast<uint8_t>(map.expanderCount);
+
+            }
         }
     } else if (lease == 0 || lease != session.lease) status = Status::expired;
     else if (revision != session.revision) status = Status::conflict;
     else if (command == 2) {
-        if (end - data != 1 || *data >= kSocketCount) status = Status::invalid;
+        if (end - data != 1 || *data >= map.socketCount()) status = Status::invalid;
         else {
             const auto& row = map.connections[*data];
             *output++ = *data;
@@ -74,9 +79,12 @@ inline std::size_t respond(PatchMap& map, Session& session,
             *output++ = static_cast<uint8_t>(row.tag);
             writeText(output, row.destination); writeText(output, row.group);
         }
+    } else if (command == 6) {
+        if (end - data != 1 || *data >= map.expanderCount) status = Status::invalid;
+        else { *output++ = static_cast<uint8_t>(map.expanders[*data].type); writeText(output, map.expanders[*data].name); }
     } else if (session.revision == kMaxWireInteger) status = Status::expired;
     else if (command == 3) {
-        if (end - data < 5 || data[0] >= kSocketCount ||
+        if (end - data < 5 || data[0] >= map.socketCount() ||
             data[1] >= kColourCount || data[2] > 12) status = Status::invalid;
         else {
             Connection candidate;
@@ -90,6 +98,33 @@ inline std::size_t respond(PatchMap& map, Session& session,
         char title[kTextBytes]{};
         if (!readText(data, end, title) || data != end) status = Status::invalid;
         else { std::memcpy(map.title, title, sizeof(title)); ++session.revision; }
+    }
+    if (status == Status::ok && command == 5) {
+        if (end - data < 2 || *data > 3 || map.expanderCount == kMaxExpanders) status = Status::invalid;
+        else {
+            Expander candidate;
+            candidate.type = *data++;
+            if (!readText(data, end, candidate.name) || data != end) status = Status::invalid;
+            else { map.expanders[map.expanderCount++] = candidate; ++session.revision; }
+        }
+    } else if (status == Status::ok && command == 7) {
+        if (end - data < 2 || *data >= map.expanderCount) status = Status::invalid;
+        else {
+            const auto index = *data++; char name[kGroupBytes]{};
+            if (!readText(data, end, name) || data != end) status = Status::invalid;
+            else { std::memcpy(map.expanders[index].name, name, sizeof(name)); ++session.revision; }
+        }
+    } else if (status == Status::ok && command == 8) {
+        if (end - data != 2 || data[0] >= map.expanderCount || data[1] >= map.expanderCount) status = Status::invalid;
+        else {
+            const int from = data[0], to = data[1];
+            const int direction = from < to ? 1 : -1;
+            for (int index = from; index != to; index += direction) {
+                std::swap(map.expanders[index], map.expanders[index + direction]);
+                for (int i = 0; i < 8; ++i) std::swap(map.connections[20 + index * 8 + i], map.connections[20 + (index + direction) * 8 + i]);
+            }
+            ++session.revision;
+        }
     }
     reply[kHeaderBytes] = static_cast<uint8_t>(status);
     writeInteger(reply + 16, session.revision);

@@ -19,8 +19,9 @@ jobs:
         run: make static-check
       - name: Package development preview
         run: |
-          mkdir -p build/package/programs/plug-ins
+          mkdir -p build/package/programs/plug-ins build/package/helper
           cp plugins/patch_helper.o build/package/programs/plug-ins/
+          cp helper/ThPh.lua build/package/helper/
           cp README.md build/package/
           cd build/package
           zip -r ../../patch_helper-preview.zip .

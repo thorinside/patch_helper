@@ -95,6 +95,9 @@ void testProtocolBounds() {
     assert(reply[20] == 0 && session.revision == 0 && session.lease == 44);
 }
 
+int32_t NT_algorithmIndex(const _NT_algorithm*) { return 0; }
+void NT_updateParameterDefinition(uint32_t, uint32_t) {}
+
 int main(int argc, char** argv) {
     testProtocolBounds();
     assert(argc == 2);
@@ -131,6 +134,18 @@ int main(int argc, char** argv) {
         assert(std::vector<uint8_t>(expectedBytes.begin() + 1, expectedBytes.end() - 1) == midiReply);
     }
     assert(load(Json::object()));
+    std::ifstream expandedWireInput("tests/fixtures/expanded-session.json");
+    for (const auto& frame : Json::parse(expandedWireInput)) {
+        const auto bytes = frame["request"].get<std::vector<uint8_t>>();
+        const auto expected = frame["response"].get<std::vector<uint8_t>>();
+        factory->midiSysEx(bytes.data(), bytes.size());
+        assert(std::vector<uint8_t>(expected.begin() + 1, expected.end() - 1) == midiReply);
+    }
+    const auto persistedExpanded = save();
+    assert(load(persistedExpanded) && save() == persistedExpanded);
+    assert(persistedExpanded["patch_helper"]["expanders"][1]["name"] == "Pitch");
+    assert(persistedExpanded["patch_helper"]["connections"][28]["destination"] == "Plaits V/oct");
+    assert(load(Json::object()));
     // Exercise the real factory MIDI callback, including malformed and stale writes.
     std::vector<uint8_t> request(20, 0);
     std::copy(std::begin(patch_helper::kPrefix), std::end(patch_helper::kPrefix), request.begin());
@@ -155,6 +170,37 @@ int main(int argc, char** argv) {
     request[0] = 0x7e; midiReply.clear();
     factory->midiSysEx(request.data(), request.size()); assert(midiReply.empty());
     const auto defaults = save();
+    // Extended open, append each type, reload, and validate version-2 persistence.
+    request.assign(21, 0);
+    std::copy(std::begin(patch_helper::kPrefix), std::end(patch_helper::kPrefix), request.begin());
+    request[6] = 1; request[12] = 44; request[20] = 2;
+    factory->midiSysEx(request.data(), request.size());
+    assert(midiReply[20] == 0 && midiReply.back() == 0);
+    for (int i = 0; i < patch_helper::kMaxExpanders; ++i) {
+        request.resize(22); request[6] = 5; request[16] = i; request[20] = i % 4; request[21] = 0;
+        factory->midiSysEx(request.data(), request.size());
+        assert(midiReply[20] == 0);
+    }
+    const auto expanded = save();
+    assert(expanded["patch_helper"]["connections"].size() == patch_helper::kMaxSockets);
+    assert(expanded["patch_helper"]["expanders"].size() == patch_helper::kMaxExpanders);
+    assert(load(expanded) && save() == expanded);
+    request.resize(21); request[6] = 1; request[12] = 45; request[20] = 2;
+    factory->midiSysEx(request.data(), request.size());
+    assert(midiReply[20] == 0 && midiReply[34] == patch_helper::kMaxExpanders);
+    request[6] = 5; request[16] = 0; request[20] = 0;
+    factory->midiSysEx(request.data(), request.size());
+    assert(midiReply[20] == 1 && save() == expanded);
+    auto invalidExpanded = expanded;
+    invalidExpanded["patch_helper"]["expanders"][0]["type"] = 4;
+    assert(!load(invalidExpanded) && save() == expanded);
+    invalidExpanded = expanded;
+    invalidExpanded["patch_helper"]["connections"][1]["socket"] = 123;
+    assert(!load(invalidExpanded) && save() == expanded);
+    factory->step(algorithm, nullptr, 0);
+    assert(algorithm->parameters[0].max == patch_helper::kMaxSockets);
+    assert(load(Json::object()));
+
     assert(defaults["patch_helper"]["connections"].size() == 20);
     assert(load(fixture));
     assert(save() == fixture);
