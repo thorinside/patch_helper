@@ -33,9 +33,8 @@ tests. Before editing a hardware preset, export a preset containing the plugin
 and confirm where the firmware embeds its custom serialization object; that
 outer preset envelope has not yet been verified on a device.
 
-Install `helper/ThPh.lua` at the SD-card root alongside the `programs`
-folder. In NT Helper, open the Patch Helper slot and choose **Load SD companion**.
-Helper downloads `/helper/ThPh.lua` and runs it on the computer.
+Install the source file `helper/ThPh.lua` in `/programs/helper/` on the SD card. In NT Helper, open the Patch Helper slot and choose **Load SD companion**.
+Helper downloads `/programs/helper/ThPh.lua` and runs it on the computer.
 The file defines the straight table and clickable socket minimap. Apply each
 edited row or press Enter, then use the normal **Save preset** action to keep
 acknowledged changes on the NT. Reload after any uncertain write.

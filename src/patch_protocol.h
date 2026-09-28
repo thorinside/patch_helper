@@ -20,8 +20,10 @@ inline void writeInteger(uint8_t* data, uint32_t value) {
     for (int i = 0; i < 4; ++i) { data[i] = value & 127; value >>= 7; }
 }
 inline bool isRequest(const uint8_t* data, std::size_t size) {
-    if (size < kHeaderBytes || size > 120 ||
-        std::memcmp(data, kPrefix, sizeof(kPrefix)) != 0) return false;
+    if (size < kHeaderBytes || size > 120) return false;
+    // The NT loader does not export memcmp. Compare the short wire prefix here.
+    for (std::size_t i = 0; i < sizeof(kPrefix); ++i)
+        if (data[i] != kPrefix[i]) return false;
     for (std::size_t i = 0; i < size; ++i) if (data[i] > 127) return false;
     return data[6] >= 1 && data[6] <= 9;
 }

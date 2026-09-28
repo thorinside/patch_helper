@@ -12,7 +12,7 @@ symbols = subprocess.check_output(['arm-none-eabi-nm', str(path)], text=True)
 assert any(line.split()[-2:] == ['T', 'pluginEntry'] for line in symbols.splitlines())
 allowed = {'NT_drawText', 'NT_intToString', 'memcpy', 'memset', 'strlen', 'strncpy', 'strcpy',
            'NT_algorithmIndex', 'NT_parameterOffset', 'NT_setParameterFromAudio', 'NT_updateParameterDefinition', 'strcat', 'NT_getSlot', 'NT_sendMidiSysEx', '_ZNK8_NT_slot4guidEv', '_ZNK8_NT_slot6pluginEv',
-           'memcmp', '_GLOBAL_OFFSET_TABLE_'}  # Required by position-independent ARM code.
+           '_GLOBAL_OFFSET_TABLE_'}  # Required by position-independent ARM code.
 for line in symbols.splitlines():
     fields = line.split()
     if len(fields) == 2 and fields[0] == 'U':

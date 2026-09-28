@@ -3,12 +3,12 @@
 Source: Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`, reread 2026-09-27
 and captured in `source-spec.md`. The user approved the straight table/minimap
 and reiterated host-executed SD-card Lua as required. The user then explicitly
-selected a top-level `helper` directory instead of the plug-ins directory.
+selected `/programs/helper/` for companions, separate from the plug-ins directory.
 
 ## Installation and execution
 
 - NT binary: `/programs/plug-ins/patch_helper.o`.
-- Host Lua companion: `/helper/ThPh.lua`.
+- Host Lua companion: `/programs/helper/ThPh.lua`.
 - The development archive includes both paths. Copy its folders to the SD root.
 - In Helper, select the Patch Helper algorithm's standard view and choose
   **Load SD companion**. It uses the existing whole-file SD download operation.
@@ -17,7 +17,7 @@ selected a top-level `helper` directory instead of the plug-ins directory.
 - **Reload companion & map** re-downloads the source and opens a fresh map lease.
   Missing/failed companions leave ordinary parameter/spreadsheet views available.
 
-Discovery uses `/helper/<GUID>.lua`, with case preserved and a four-character
+Discovery uses `/programs/helper/<GUID>.lua`, with case preserved and a four-character
 filename-safe GUID. The script must declare the same GUID. This convention is
 shared by future companions, rather than a filename tied to this product.
 

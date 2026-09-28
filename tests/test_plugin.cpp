@@ -63,6 +63,13 @@ void testProtocolBounds() {
     request[6] = 4; request[12] = 43;
     request.push_back(63); request.insert(request.end(), 63, 'T');
     assert(isRequest(request.data(), request.size()));
+    for (std::size_t i = 0; i < sizeof(kPrefix); ++i) {
+        request[i] ^= 1;
+        assert(!isRequest(request.data(), request.size()));
+        request[i] ^= 1;
+    }
+    for (std::size_t size = 0; size < kHeaderBytes; ++size)
+        assert(!isRequest(request.data(), size));
     assert(respond(map, session, request.data(), request.size(), reply) == 21);
     assert(reply[20] == 0 && std::strlen(map.title) == 63);
     request.resize(20); request[6] = 3; request[16] = 1;

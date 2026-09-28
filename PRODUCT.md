@@ -39,7 +39,7 @@ Destination-based and socket-based views are in the discovery spec. The title
 and destination currently accept 63 printable ASCII characters, group 31.
 
 Revision 4 extends the Helper editor as a host-executed SD-card Lua
-companion at `/helper/ThPh.lua`, backed by the USB map bridge. The file is
+companion at `/programs/helper/ThPh.lua`, backed by the USB map bridge. The file is
 discovered by plug-in GUID. It includes named, ordered expander banks and the
 approved table/minimap. Flutter renders the controls in Helper's existing theme.
 Companion loading remains an explicit, trusted-code action; the source belongs
