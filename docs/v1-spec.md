@@ -96,27 +96,38 @@ instance has eight outputs. Repeated models are allowed. Instances can be named
 bank carries all eight connection records. This records physical hardware and
 does not configure its electronic connection or infer its presence.
 
-New maps allow 12 banks (116 total sockets). Older 13-bank preview maps remain
-readable/editable (124 sockets); their last bank uses a compatibility selector
-page on the NT. Add is disabled at the new-map limit and during pending field
+New maps allow eight banks (84 total sockets), supporting eight NTX-8CV instances.
+Older preview maps up to 13 banks remain readable/editable (124 sockets); banks
+beyond eight use an Other sockets compatibility selector on the NT. Add is disabled at the new-map limit and during pending field
 synchronization. Structural operations use acknowledged transactions and are not
 blindly replayed after an uncertain result.
 
 ## NT pages and full field editing
 
-Each socket has its own parameter page: Input 1–12, Output 1–8, E1 Out 1–8, and
-subsequent banks. Page count changes automatically via `NT_updateParameterPages()`.
-Colour and tag use independent parameters. Saved parameter mappings retain
-preview indices 0–2, and per-socket colour/tag pairs at `3 + 2*N`, `4 + 2*N`.
-The current implementation reserves 235 parameters. Each Cable colour value
-returns `colour | destination`, and each Tag value returns `tag | group`, through
-`parameterString()` with `kNT_unitHasStrings`. Empty text omits the separator;
-tag 0 displays None. Both complete 32-character text fields fit the callback
-buffer. Colour/tag remain independently editable and mappable; text is read-only
-on the NT and updates from the current map whenever firmware asks for its value.
-The callback formats the supplied numeric value, including host previews.
-The algorithm display also shows socket, colour and destination; clipping of
-legacy longer text never truncates its saved value.
+Native inputs and outputs each have a permanent parameter page: Input 1–12
+and Output 1–8. Every socket page contains four separate fields in table order:
+Destination, Cable colour, Tag, Group. Destination and Group are fixed-value
+`kNT_unitHasStrings` properties, greyed out with `NT_setParameterGrayedOut()`;
+colour and numeric tag remain editable. The text callback returns the full value,
+without joining it to colour/tag. Empty text displays a dash. New 32-character
+values and preserved 63-character destinations fit the SDK's 64-byte buffer.
+
+With expanders present, an Expander bank page selects bank 1–8 and displays
+its read-only, greyed-out name. The following eight socket pages show the selected
+bank (E1 Out 1–8 through E8 Out 1–8). Bank changes refresh page names and parameter
+indices via `NT_updateParameterPages()`; the shared read-only text properties
+follow that explicit selection. Helper continues to show all banks together.
+There are 20 pages without expanders, 29 with up to eight banks, and one extra
+compatibility page for older larger maps. Selecting a bank does not edit cables.
+
+This layout uses 231 parameters. Numeric colour/tag indices remain independent
+for all 84 sockets (`3 + 2*N`, `4 + 2*N`), preserving preview indices 0–2 and all
+mappings through bank eight. Native socket text occupies 171–210, selected-bank
+text 211–226, Bank 227, Name 228, and compatibility text 229–230 (plugin-local
+indices; firmware common parameters add their offset). Older mappings targeting
+banks 9–12 overlap the new text region and are not retained as per-bank mappings;
+those map records remain intact and editable through the compatibility selector.
+Do not describe this preview transition as preserving those higher-bank mappings.
 
 **Owner decision, 2026-09-28:** the firmware author confirmed that native editable
 text properties are not exposed in the C++ SDK yet, and that the planned limit
@@ -128,19 +139,31 @@ limited to 32 characters for new edits in preparation for that API.
 The SDK's `parameterString(self, p, v, buffer)` callback returns an entire
 NULL-terminated value, not a single character; its buffer is at least 64 bytes.
 Use `kNT_unitHasStrings` for native formatted values until editable strings are
-supported. The current combined strings are an interim implementation. The owner
-requests separate fixed-value `kNT_unitHasStrings` properties for Destination
-and Group, greyed out with `NT_setParameterGrayedOut()` until native editing is
-available. An isolated device test confirms that these text rows remain visible
-when greyed out. Keep colour/tag editable and retain independent socket pages.
-Production adoption awaits the expander-capacity and mapping-compatibility
-decision; the existing combined display and bank limit remain unchanged for now.
+supported. Separate greyed-out text properties are now implemented in Patch
+Helper, using the bank selector to support eight expanders within the measured
+parameter limit. The earlier concatenated display and four-bank proposal are
+superseded.
 
 Investigation on 2026-09-28 verified the diagnostic SysEx `0x53` receive path
 and `parameterString` / `0x50` readback, but that does not expose a native text
 editor. The connected v1.19.0beta build converts SDK units 18–99 to type 0.
 Native text editing is now a future firmware/SDK integration, not a current
-V1 acceptance requirement. Native expander-name display remains outstanding.
+V1 acceptance requirement. Native expander names are displayed on the bank page.
+
+## NT connected-socket view
+
+The custom NT view leaves the native parameter row visible and reserves the top
+12 pixels for it. Up to four connected sockets are drawn below it, at text
+baselines 21, 34, 47 and 60. Each shows socket label, colour and destination.
+A nonempty destination defines a connected socket; unused rows are omitted even
+if they retain a colour or tag. An empty map leaves the list area blank.
+
+Only the right encoder is overridden: it scrolls one connected row per detent,
+clamping at each end so the last window stays filled when at least four records
+exist. Other controls remain firmware-owned. The first visible socket anchors
+the viewport across map updates, clamped when rows disappear. Scrolling changes
+only local view state, not native parameter values, map content or revision.
+All sockets remain available in the native pages and Helper table for editing.
 
 ## Synchronization and Lua events
 
@@ -207,15 +230,21 @@ retained the map and pages. The firmware accepted 240 plugin parameters but
 rejected 241 and 251, including in an empty preset. This is a measured firmware
 constraint, not a timeless SDK guarantee.
 
+The revised four-field layout was exercised on the device for Input 1 and E8
+Out 1 using an eight-bank test map; the working preset was restored afterward.
+The connected-list screen clears the native top row. Right-encoder scrolling,
+filtering and unchanged map/revision are covered by native callback tests;
+physical encoder operation remains an owner acceptance check.
+
 The action dialog is covered by Flutter tests for all four choices, cancel and
 Escape, bank limits, invalid Lua schemas, stale actions and stable geometry.
-Full Helper suite: 3921 tests passed, with a clean analyzer.
+Full Helper suite: 3924 tests passed, with a clean analyzer.
 The running macOS app opens and cancels the updated SD Lua dialog; the sync
 indicator remains at the top left. Native sanitizer tests, ARM object
 inspection and strict-alignment Unicorn startup checks are separate from hardware
 acceptance. No hardware acceptance is inferred solely from those tests.
 
-Outstanding: native expander-name display; end-of-chain
+Outstanding: end-of-chain
 preset merge/lifecycle behavior; persistence of pending edits across editor/app
 lifecycle changes; wider firmware acceptance and production release review.
 

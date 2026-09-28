@@ -12,7 +12,7 @@ constexpr int kSocketCount = 20;
 constexpr int kMaxExpanders = (128 - kSocketCount) / 8;
 // The connected v1.19 beta accepts at most 240 plug-in parameters.
 // Keep old 13-bank records readable; new maps fit independent native pages.
-constexpr int kNativeExpanders = 12;
+constexpr int kNativeExpanders = 8;
 constexpr int kNativeSockets = kSocketCount + 8 * kNativeExpanders;
 constexpr int kMaxSockets = kSocketCount + 8 * kMaxExpanders;
 inline constexpr const char* kExpanders[] = {"NTX-8CV", "ES-5", "ESX-8GT", "ESX-8CV"};

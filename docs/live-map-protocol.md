@@ -112,8 +112,9 @@ Additional commands:
 Types 0–3 are NTX-8CV, ES-5, ESX-8GT, ESX-8CV. Names are at most 32 printable
 ASCII characters. Command 6 is a read; 5/7/8 increment revision once on success.
 A move shifts complete eight-socket banks and their metadata atomically. Native
-IDs stay 0–19; expander IDs follow in physical list order. Capacity is thirteen
-banks, derived from the 7-bit socket ID. Invalid payloads and overflow fail
+IDs stay 0–19; expander IDs follow in physical list order. Wire/preset capacity
+is thirteen banks, derived from the 7-bit socket ID. New additions stop at eight
+banks; older larger maps remain readable and editable. Invalid payloads and overflow fail
 without mutation. Maximum frame size stays 123 bytes.
 
 Helper reads title/count, every expander, and every configured socket under one

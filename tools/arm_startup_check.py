@@ -74,7 +74,7 @@ def run(elf_path, imports, fill):
             cpu.reg_write(UC_ARM_REG_R0, len(text))
         elif name == 'NT_drawText':
             drawn.append(string(r2).decode())
-        elif name in ('NT_updateParameterPages', 'NT_updateParameterDefinition'):
+        elif name in ('NT_updateParameterPages', 'NT_updateParameterDefinition', 'NT_setParameterGrayedOut'):
             pass
         elif name == 'NT_setParameterFromAudio':
             write(0x20010002 + r1 * 2, struct.pack('<h', r2))
@@ -111,7 +111,7 @@ def run(elf_path, imports, fill):
 
 
 arguments = sys.argv[1:]
-expected_drawn = [v for i in range(1, 5) for v in (f'In {i}', 'None', '(unused)')]
+expected_drawn = [] # An empty map leaves the native parameter row unobstructed.
 if arguments and arguments[0] == '--native-text-probe':
     arguments = arguments[1:]
     expected_drawn = ['Changes:', '3', 'Last parameter:', '2']

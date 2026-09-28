@@ -119,16 +119,23 @@ disposal and pauses with the inactive editor/app.
 The original selector/colour/tag indices 0–2 remain for preview preset/mapping
 compatibility. Older 13-bank maps expose these on a final compatibility page;
 ordinary maps omit them from visible pages. Socket N (zero-based) owns
-colour parameter `3 + 2*N` and tag `4 + 2*N`. Each active socket has a two-control
-page, grouped to preserve knob position when changing pages. New maps support
-12 banks: the connected firmware accepts 240 plug-in parameters but rejects 241.
-Capacity for 235 definitions and 117 pages is reserved in calculateRequirements(); construct
-uses only that memory. The visible page count follows the active socket count;
-step calls `NT_updateParameterPages()` when it changes. Callback-safe setters
-project acknowledged records with reentrancy protection. The old selected-socket
-property still identifies the most recently edited native row for Lua callbacks.
-Preset deserialization invalidates the lease and reprojects controls.
-Native text entry remains pending.
+colour parameter `3 + 2*N` and tag `4 + 2*N` through bank eight. Each native
+socket has a four-field page: Destination, Cable colour, Tag, Group. An Expander
+bank selector chooses which bank's eight pages follow the twenty native pages.
+This supports eight new banks within 231 definitions and 30 reserved pages;
+older larger maps retain their records but higher-bank mappings need reassignment.
+The connected firmware accepts 240 plug-in parameters and rejects 241.
+
+All storage is reserved in calculateRequirements(); construct uses only that
+memory. Step calls `NT_updateParameterPages()` when bank selection or inventory
+changes. Callback-safe setters project acknowledged records with reentrancy
+protection. The old selected-socket property still identifies the most recently
+edited native row for Lua callbacks. Preset deserialization invalidates the
+lease and reprojects controls. Native text is shown in separate greyed-out
+properties; editing remains in Helper until SDK support arrives.
+
+The NT custom view independently scrolls connected sockets with the right
+encoder below the native parameter row. This changes no map or property state.
 
 ## Lua choice dialogs
 

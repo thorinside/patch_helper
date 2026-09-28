@@ -158,9 +158,9 @@ four-slot Patch Pages Test map was restored afterward.
 
 ![Separate read-only NT text properties](evidence/read-only-socket-text.png)
 
-This proves the display mechanism without changing Patch Helper's parameter
-layout or expander limit. Production adoption awaits the capacity decision:
-two distinct string properties per socket require reallocating the current
-235-parameter layout. Four banks fit four fields per socket plus the legacy
-controls; five banks exceed the measured 240-parameter ceiling. Existing larger
-maps and parameter mappings need explicit compatibility handling.
+Production now uses separate greyed-out text properties. Twenty native socket
+pages plus eight pages following an explicit Expander bank selector support eight
+banks within 231 parameters. Every socket through bank eight retains independent
+numeric colour/tag indices. The four-bank proposal is superseded; older larger
+maps retain their records and use an Other sockets compatibility page, though
+old mappings for banks 9–12 overlap the new text range and need reassignment.

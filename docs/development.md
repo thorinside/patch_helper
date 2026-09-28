@@ -6,7 +6,7 @@ Started from Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`,
 **Disting NT physical connection map and Helper companion interface**.
 The owner authorized development on 2026-09-27 and named the as-built baseline
 **V1** on 2026-09-28. [v1-spec.md](v1-spec.md) records the current scope and
-remaining acceptance work, including native expander-name display. The original
+remaining acceptance work, including lifecycle acceptance. The original
 brainstorming capture remains in source-spec.md. V1 is not a production tag.
 
 The live workflow now includes preset serialization, SD companion loading/cache,
@@ -138,8 +138,9 @@ The native harness proves the callback payload, not that outer envelope.
 ## Remaining integration work
 
 See [V1](v1-spec.md) for current acceptance boundaries. Native destination/group
-text now uses `parameterString()` alongside the existing colour/tag values.
-Expander-name display remains open. The owner accepts display-only text pending
+text now uses separate greyed-out `parameterString()` properties. Eight expander
+banks share one set of eight visible socket pages, selected on Expander bank;
+colour/tag indices remain independent and the bank name is also displayed. The owner accepts display-only text pending
 firmware/SDK support for native editing; no custom text editor is approved.
 End-of-chain preset merging and preservation of pending field edits across
 editor/app disposal remain open. Gear sorting/group presentation and arbitrary
@@ -174,14 +175,19 @@ delimiters. Companion/map round-trip acceptance remains a separate check.
 
 ## Per-socket native pages
 
-The native editor now exposes one page per active socket with independent colour
-and tag parameters. Definitions/page arrays are instance-owned fixed SRAM,
-reserved up front; no post-construction allocation or GOT is introduced. The
-three old parameter indices are retained but hidden from pages. New parameters
-append indices 3–234 for the 20 native sockets and 12 expander banks. `NT_updateParameterPages()` notifies the host when expander
-inventory changes. Native and ARM startup tests cover all parameter callbacks,
-page indices, independent rows, maximum bank bounds and the host notification.
+The native editor exposes four separate fields per socket: Destination, Cable
+colour, Tag and Group. The two text fields are fixed-value, greyed-out string
+properties. Twenty native socket pages remain permanent; an Expander bank page
+selects one of eight banks for the following eight socket pages. This uses 231
+parameters, with independent colour/tag indices for all 84 sockets. Old maps
+beyond eight banks retain their data and an Other sockets compatibility page.
+Mappings through bank eight retain their indices; older higher-bank mappings
+need reassignment because their indices now hold text properties.
 
+Definitions and page arrays are instance-owned SRAM reserved up front.
+`NT_updateParameterPages()` notifies the host when inventory or bank selection
+changes. Native and ARM startup tests cover callbacks, page indices, independent
+rows, bank bounds, greyed-out strings and host notification.
 
 ## Connected-device verification, 2026-09-27
 
@@ -189,8 +195,8 @@ On v1.19.0beta (Sep 16 2026), controlled builds with identical instance storage
 accepted 240 plug-in parameters and rejected 241, 242, 243, 247, 248, 249 and
 251. The 251-parameter build was also rejected in an empty preset. Moving the
 instance to DRAM did not resolve it. These are observed firmware limits, not a
-guarantee for other firmware. The final build uses 235 parameters plus the
-firmware Bypass parameter. New maps stop at 12 banks; the existing 13-bank wire
+guarantee for other firmware. At that stage the build used 235 parameters plus
+the firmware Bypass parameter and new maps stopped at 12 banks; the existing 13-bank wire
 and preset format is retained, with a selector/colour/tag compatibility page
 for old maps. No records are silently truncated.
 
@@ -220,3 +226,32 @@ formatted values on Input 1. This verifies display-only text, not native text
 editing. The existing page count, colour/tag indices and numeric ranges remain.
 
 ![NT Input 1 properties with destination and group](evidence/native-socket-text.png)
+
+
+## Eight-bank field pages and connected list (2026-09-28)
+
+The production layout now has 231 plugin parameters plus Bypass. On the connected
+NT, Input 1 displayed four separate properties. Loading an eight-bank test map,
+selecting Bank 8, and reading the string properties returned `Bank eight CV 1`,
+`Bank eight`, and expander name `NTX 8`. The parameter screen displayed E8 Out 1
+with all four fields. This tests recorded banks, not eight attached expanders.
+The working four-slot preset was restored afterward.
+
+![Four native fields](evidence/native-four-fields.png)
+![Eighth expander bank](evidence/native-bank-eight.png)
+
+The following connected-list build was uploaded and read back byte for byte:
+SHA-256 `4a9306eae18de7e7adf1cb637d9b8368ba3b41f523c8165e2858534bc52f6b02`.
+The saved preset was backed up separately as `/presets/PH 0928 111756.json`
+before upload, then restored as Patch Pages Test. The NT screen confirms the
+native parameter row remains unobstructed above baselines 21, 34, 47 and 60.
+The custom view claims only the right encoder and filters blank destinations.
+Native callback tests cover scrolling over socket gaps, both bounds, insertion,
+removal, empty maps, unchanged parameter values and unchanged map revision.
+Physical right-encoder operation remains an owner acceptance check.
+
+![Connected list below native editor](evidence/native-connected-list.png)
+
+Checks passed: native ASan/UBSan tests, cppcheck, ARM imports/PIC inspection,
+and construction/first draw at two emulated load addresses with strict alignment.
+The matching Helper branch passed all 3924 tests and analysis without issues.

@@ -11,19 +11,22 @@ optional Tag (1–12), and group. An empty destination means unused. Clearing it
 preserves the other cable metadata. The SD-card Lua companion provides the Helper editor.
 New destinations, groups and expander names accept up to 32 printable ASCII
 characters. Older longer destinations remain intact until replaced.
-On-device text editing awaits SDK support. Destination and group are displayed
-alongside the existing native controls.
+On-device text editing awaits SDK support. Each native socket page has separate
+**Destination**, **Cable colour**, **Tag**, and **Group** properties. Destination
+and Group are greyed out and read-only; colour and tag remain editable.
 
-The NT has one parameter page per socket: **Input 1–12**, **Output 1–8**,
-then **E1 Out 1–8** and subsequent expander banks, up to 12 banks. Each page has independent
-**Cable colour** and **Tag** controls. Their displayed values include the
-destination and group respectively: `Purple | From Beads L` and `1 | FX`.
-Text follows changes made in Helper; colour and tag remain editable on the NT.
-Tag 0 means none. Adding an expander in
-Helper adds eight pages on the NT automatically. The display keeps the native
-parameter line visible and shows cable records below it, following the last
-socket edited on the NT. Long destinations are clipped only on screen;
-the saved text is retained.
+The NT keeps **Input 1–12** and **Output 1–8** pages. With expanders present,
+**Expander bank** selects one of up to **eight banks**, shows its name, and updates
+the eight expander socket pages to that bank. Helper shows every bank together.
+Text updates from Helper automatically. Tag 0 means none; blank text displays a dash.
+Older maps with more than eight banks retain all their records and can use
+**Other sockets** on the NT. Numeric mappings through bank eight remain stable;
+old mappings for higher banks need reassignment to the compatibility controls.
+
+The custom NT view keeps the native parameter row at the top and shows up to
+four connected sockets below it. Turn the **right encoder** to scroll the list.
+Sockets with a blank destination are omitted here; every socket remains available
+in the parameter pages and Helper table. Scrolling does not change the patch.
 
 ## Development preview
 
@@ -35,7 +38,7 @@ successful ARM build alone.
 
 For owner testing, the built `plugins/patch_helper.o` belongs under
 `programs/plug-ins/` on the SD card. Restart or remount the card, then select
-**Patch Helper** from Add algorithm. New instances show unused sockets. The
+**Patch Helper** from Add algorithm. New instances have an empty connection list. The
 [fixture](tests/fixtures/native-map.json) exercises populated maps in native
 tests. Saving and recalling the connected test preset has been verified; end-of-chain
 preset merging and standalone preset-file codec integration remain pending.
@@ -53,8 +56,8 @@ changes across preset loads. Status/error feedback does not move the table.
 
 Use the **+** action at the top right to choose NTX-8CV, ES-5, ESX-8GT, or ESX-8CV
 in a dialog. The sync indicator remains at the top left. Each adds eight physical
-output records. Older 13-bank maps remain readable; the last bank uses a
-**Legacy bank 13** selector page on the NT. Expander section actions rename instances and move their whole
+output records. Older 13-bank maps remain readable; banks beyond eight use the
+**Other sockets** selector page on the NT. Expander section actions rename instances and move their whole
 banks, retaining cable records. This does not configure an expander's electronic
 connection or change routing. See the [companion contract](docs/companion-contract.md)
 and [live map protocol](docs/live-map-protocol.md).

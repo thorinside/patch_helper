@@ -13,24 +13,37 @@ namespace {
 // Keep the three preview-era parameter indices for saved mappings, but expose
 // independent per-socket controls and formatted text on the native pages.
 constexpr int kLegacyParameters = 3;
-constexpr int kParameterCount = kLegacyParameters + 2 * patch_helper::kNativeSockets;
+constexpr int kNumericParameters = kLegacyParameters + 2 * patch_helper::kNativeSockets;
+constexpr int kNativeText = kNumericParameters;
+constexpr int kExpanderText = kNativeText + 2 * patch_helper::kSocketCount;
+constexpr int kBank = kExpanderText + 16;
+constexpr int kBankName = kBank + 1;
+constexpr int kLegacyText = kBankName + 1;
+constexpr int kParameterCount = kLegacyText + 2;
+constexpr int kBankPage = patch_helper::kSocketCount;
+constexpr int kExpanderPages = kBankPage + 1;
+constexpr int kCompatibilityPage = kExpanderPages + 8;
 static_assert(kParameterCount <= 240);
 struct Algorithm : _NT_algorithm {
     patch_helper::PatchMap map;
     patch_helper::PatchMap scratch;
     patch_helper::Session session;
     std::array<_NT_parameter, kParameterCount> definitions{};
-    std::array<std::array<uint8_t, 2>, patch_helper::kNativeSockets> pageIndices{};
-    std::array<std::array<char, 16>, patch_helper::kNativeSockets> pageNames{};
-    std::array<_NT_parameterPage, patch_helper::kNativeSockets + 1> pages{};
+    std::array<std::array<uint8_t, 4>, patch_helper::kSocketCount + 8> pageIndices{};
+    std::array<std::array<char, 16>, patch_helper::kSocketCount + 8> pageNames{};
+    std::array<_NT_parameterPage, kCompatibilityPage + 1> pages{};
     _NT_parameterPages pageList{};
     bool projecting = false;
     bool needsProjection = true;
+    bool needsGray = true;
+    int firstVisibleSocket = 0;
+    int configuredBank = -1;
+    int configuredExpanders = -1;
 };
 constexpr _NT_parameter parameters[] = {
     {"First socket", 1, 20, 1, kNT_unitNone, 0, nullptr},
-    {"Cable colour", 0, patch_helper::kColourCount - 1, 0, kNT_unitHasStrings, 0, nullptr},
-    {"Tag", 0, 12, 0, kNT_unitHasStrings, 0, nullptr},
+    {"Cable colour", 0, patch_helper::kColourCount - 1, 0, kNT_unitEnum, 0, patch_helper::kColours},
+    {"Tag", 0, 12, 0, kNT_unitNone, 0, nullptr},
 };
 void socketName(char* name, int socket) {
     if (socket < 20) {
@@ -60,18 +73,38 @@ _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
         const int colour = kLegacyParameters + 2 * socket;
         algorithm->definitions[colour] = parameters[1];
         algorithm->definitions[colour + 1] = parameters[2];
-        algorithm->pageIndices[socket] = {static_cast<uint8_t>(colour), static_cast<uint8_t>(colour + 1)};
-        socketName(algorithm->pageNames[socket].data(), socket);
-        algorithm->pages[socket] = {algorithm->pageNames[socket].data(), 2, 1, {0, 0}, algorithm->pageIndices[socket].data()};
     }
-    static constexpr uint8_t legacyIndices[] = {0, 1, 2};
-    algorithm->pages[patch_helper::kNativeSockets] = {"Legacy bank 13", 3, 0, {0, 0}, legacyIndices};
+    for (int p = kNativeText; p < kBank; p += 2) {
+        algorithm->definitions[p] = {"Destination", 0, 0, 0, kNT_unitHasStrings, 0, nullptr};
+        algorithm->definitions[p + 1] = {"Group", 0, 0, 0, kNT_unitHasStrings, 0, nullptr};
+    }
+    for (int socket = 0; socket < patch_helper::kSocketCount; ++socket) {
+        const int colour = kLegacyParameters + 2 * socket;
+        const int text = kNativeText + 2 * socket;
+        algorithm->pageIndices[socket] = {static_cast<uint8_t>(text), static_cast<uint8_t>(colour),
+            static_cast<uint8_t>(colour + 1), static_cast<uint8_t>(text + 1)};
+        socketName(algorithm->pageNames[socket].data(), socket);
+        algorithm->pages[socket] = {algorithm->pageNames[socket].data(), 4, 1, {0, 0}, algorithm->pageIndices[socket].data()};
+    }
+    algorithm->definitions[kBank] = {"Bank", 1, 1, 1, kNT_unitNone, 0, nullptr};
+    algorithm->definitions[kBankName] = {"Name", 0, 0, 0, kNT_unitHasStrings, 0, nullptr};
+    algorithm->definitions[kLegacyText] = algorithm->definitions[kNativeText];
+    algorithm->definitions[kLegacyText + 1] = algorithm->definitions[kNativeText + 1];
+    static constexpr uint8_t bankIndices[] = {kBank, kBankName};
+    algorithm->pages[kBankPage] = {"Expander bank", 2, 0, {0, 0}, bankIndices};
+    static constexpr uint8_t legacyIndices[] = {0, kLegacyText, 1, 2, kLegacyText + 1};
+    algorithm->pages[kCompatibilityPage] = {"Other sockets", 5, 0, {0, 0}, legacyIndices};
     algorithm->pageList = {patch_helper::kSocketCount, algorithm->pages.data()};
     algorithm->parameterPages = &algorithm->pageList;
     return algorithm;
 }
 int selectedSocket(const Algorithm& algorithm) {
     return std::clamp(algorithm.v ? int(algorithm.v[0]) - 1 : 0, 0, algorithm.map.socketCount() - 1);
+}
+
+int selectedBank(const Algorithm& algorithm) {
+    return std::clamp(algorithm.v ? int(algorithm.v[kBank]) - 1 : 0, 0,
+        std::max(0, std::min(algorithm.map.expanderCount, patch_helper::kNativeExpanders) - 1));
 }
 
 // Project the selected record into native controls without treating these
@@ -93,6 +126,14 @@ void projectControls(Algorithm& algorithm) {
         if (algorithm.v[p] != connection.colour) NT_setParameterFromAudio(index, offset + p, connection.colour);
         if (algorithm.v[p + 1] != connection.tag) NT_setParameterFromAudio(index, offset + p + 1, connection.tag);
     }
+    const int bank = selectedBank(algorithm) + 1;
+    if (algorithm.v[kBank] != bank) NT_setParameterFromAudio(index, offset + kBank, bank);
+    for (int p = kNativeText; p < kParameterCount; ++p) {
+        if (p == kBank) continue;
+        if (algorithm.v[p] != 0) NT_setParameterFromAudio(index, offset + p, 0);
+        if (algorithm.needsGray) NT_setParameterGrayedOut(index, offset + p, true);
+    }
+    algorithm.needsGray = false;
     algorithm.projecting = false;
     algorithm.needsProjection = false;
 }
@@ -100,6 +141,17 @@ void projectControls(Algorithm& algorithm) {
 void parameterChanged(_NT_algorithm* self, int p) {
     auto& algorithm = *static_cast<Algorithm*>(self);
     if (algorithm.projecting || !self->v || p < 0 || p >= kParameterCount) return;
+    if (p == kBank) {
+        if (algorithm.map.expanderCount) {
+            algorithm.projecting = true;
+            NT_setParameterFromAudio(NT_algorithmIndex(self), NT_parameterOffset(),
+                patch_helper::kSocketCount + selectedBank(algorithm) * 8 + 1);
+            algorithm.projecting = false;
+        }
+        algorithm.needsProjection = true;
+        return;
+    }
+    if (p >= kNumericParameters) return; // Read-only text never changes map state.
     if (p >= kLegacyParameters) {
         const int socket = (p - kLegacyParameters) / 2;
         if (socket >= algorithm.map.socketCount()) return;
@@ -138,23 +190,67 @@ void step(_NT_algorithm* self, float*, int) {
         NT_updateParameterDefinition(NT_algorithmIndex(self), 0);
         algorithm.needsProjection = true;
     }
-    const auto pageCount = static_cast<uint32_t>(std::min(algorithm.map.socketCount(), patch_helper::kNativeSockets + 1));
-    if (algorithm.pageList.numPages != pageCount) {
-        algorithm.pageList.numPages = pageCount;
+    const int bankMax = std::max(1, std::min(algorithm.map.expanderCount, patch_helper::kNativeExpanders));
+    if (algorithm.definitions[kBank].max != bankMax) {
+        algorithm.definitions[kBank].max = bankMax;
+        NT_updateParameterDefinition(NT_algorithmIndex(self), kBank);
+        algorithm.needsProjection = true;
+    }
+    const int bank = selectedBank(algorithm);
+    if (algorithm.configuredBank != bank || algorithm.configuredExpanders != algorithm.map.expanderCount) {
+        // Only one bank's eight text pages are visible at a time. Every bank's
+        // colour/tag parameters retain their own stable indices and mappings.
+        for (int row = 0; row < 8; ++row) {
+            const int socket = patch_helper::kSocketCount + bank * 8 + row;
+            const int storage = patch_helper::kSocketCount + row;
+            const int colour = kLegacyParameters + 2 * socket;
+            const int text = kExpanderText + 2 * row;
+            algorithm.pageIndices[storage] = {static_cast<uint8_t>(text), static_cast<uint8_t>(colour),
+                static_cast<uint8_t>(colour + 1), static_cast<uint8_t>(text + 1)};
+            socketName(algorithm.pageNames[storage].data(), socket);
+            algorithm.pages[kExpanderPages + row] = {algorithm.pageNames[storage].data(), 4, 1,
+                {0, 0}, algorithm.pageIndices[storage].data()};
+        }
+        algorithm.pageList.numPages = algorithm.map.expanderCount == 0 ? patch_helper::kSocketCount
+            : kCompatibilityPage + (algorithm.map.expanderCount > patch_helper::kNativeExpanders ? 1 : 0);
+        algorithm.configuredBank = bank;
+        algorithm.configuredExpanders = algorithm.map.expanderCount;
         NT_updateParameterPages(NT_algorithmIndex(self));
         algorithm.needsProjection = true;
     }
     if (algorithm.needsProjection) projectControls(algorithm);
 }
 
+// Anchor by socket identity so updates above the viewport do not move it.
+// This bounded scan uses only stack storage and never changes preset state.
+int connectedWindow(Algorithm& algorithm, std::array<int, patch_helper::kMaxSockets>& sockets,
+                    int& count, int delta = 0) {
+    count = 0;
+    int first = 0;
+    for (int socket = 0; socket < algorithm.map.socketCount(); ++socket) {
+        if (!algorithm.map.connections[socket].connected()) continue;
+        if (socket < algorithm.firstVisibleSocket) ++first;
+        sockets[count++] = socket;
+    }
+    const int last = std::max(0, count - 4);
+    first = std::clamp(std::clamp(first, 0, last) + delta, 0, last);
+    algorithm.firstVisibleSocket = count ? sockets[first] : 0;
+    return first;
+}
+uint32_t hasCustomUi(_NT_algorithm*) { return kNT_encoderR; }
+void customUi(_NT_algorithm* self, const _NT_uiData& data) {
+    auto& algorithm = *static_cast<Algorithm*>(self);
+    std::array<int, patch_helper::kMaxSockets> sockets{};
+    int count;
+    connectedWindow(algorithm, sockets, count, data.encoders[1]);
+}
 bool draw(_NT_algorithm* self) {
-    const auto& algorithm = *static_cast<const Algorithm*>(self);
-
-    int first = self->v ? self->v[0] - 1 : 0;
-    if (first < 0) first = 0;
-    if (first >= algorithm.map.socketCount()) first = algorithm.map.socketCount() - 1;
-    for (int row = 0; row < 4 && first + row < algorithm.map.socketCount(); ++row) {
-        const int socket = first + row;
+    auto& algorithm = *static_cast<Algorithm*>(self);
+    std::array<int, patch_helper::kMaxSockets> sockets{};
+    int count;
+    const int first = connectedWindow(algorithm, sockets, count);
+    for (int row = 0; row < 4 && first + row < count; ++row) {
+        const int socket = sockets[first + row];
         const auto& connection = algorithm.map.connections[socket];
         char label[16]{};
         if (socket >= 20) {
@@ -171,45 +267,39 @@ bool draw(_NT_algorithm* self) {
         // The complete destination remains in preset state; screen clipping is
         // presentation only. The tiny font fits 44 characters in this column.
         char destination[45]{};
-        std::strncpy(destination, connection.connected() ? connection.destination : "(unused)", 44);
+        std::strncpy(destination, connection.destination, 44);
         NT_drawText(77, y, destination, 15, kNT_textLeft, kNT_textTiny);
     }
     return false; // Keep the native parameter line visible above the rows.
 }
-int parameterUiPrefix(_NT_algorithm*, int p, char* text) {
-    if (p < kLegacyParameters || p >= kParameterCount) return 0;
-    socketName(text, (p - kLegacyParameters) / 2);
+int textSocket(const Algorithm& algorithm, int p) {
+    if (p >= kLegacyText) return selectedSocket(algorithm);
+    if (p >= kExpanderText) return patch_helper::kSocketCount + selectedBank(algorithm) * 8 + (p - kExpanderText) / 2;
+    return (p - kNativeText) / 2;
+}
+int parameterUiPrefix(_NT_algorithm* self, int p, char* text) {
+    if (p < kLegacyParameters || p >= kParameterCount || p == kBank || p == kBankName) return 0;
+    const auto& algorithm = *static_cast<Algorithm*>(self);
+    socketName(text, p < kNumericParameters ? (p - kLegacyParameters) / 2 : textSocket(algorithm, p));
     std::strcat(text, " ");
     return static_cast<int>(std::strlen(text));
 }
-// A single property returns a complete string. Keep the established numeric
-// indices/ranges for mappings; the associated descriptive text is read-only.
-int parameterString(_NT_algorithm* self, int p, int value, char* text) {
-    if (p <= 0 || p >= kParameterCount) return 0;
+// Fixed-value, greyed-out properties return the complete descriptive text.
+int parameterString(_NT_algorithm* self, int p, int, char* text) {
+    if (p < kNativeText || p >= kParameterCount || p == kBank) return 0;
     const auto& algorithm = *static_cast<Algorithm*>(self);
-    const int socket = p < kLegacyParameters ? selectedSocket(algorithm)
-        : (p - kLegacyParameters) / 2;
-    if (socket >= algorithm.map.socketCount()) return 0;
-    const bool colour = p < kLegacyParameters ? p == 1
-        : (p - kLegacyParameters) % 2 == 0;
-    const auto& row = algorithm.map.connections[socket];
-    if (colour) {
-        std::strcpy(text, patch_helper::kColours[std::clamp(value, 0, patch_helper::kColourCount - 1)]);
-    } else if (value > 0) {
-        NT_intToString(text, std::clamp(value, 0, 12));
+    const char* value = "";
+    if (p == kBankName) {
+        if (algorithm.map.expanderCount) value = algorithm.map.expanders[selectedBank(algorithm)].name;
     } else {
-        std::strcpy(text, "None");
+        const int socket = textSocket(algorithm, p);
+        if (socket >= algorithm.map.socketCount()) return 0;
+        const int base = p >= kLegacyText ? kLegacyText : p >= kExpanderText ? kExpanderText : kNativeText;
+        const auto& row = algorithm.map.connections[socket];
+        value = (p - base) % 2 == 0 ? row.destination : row.group;
     }
-    const char* detail = colour ? row.destination : row.group;
-    if (*detail) {
-        std::strcat(text, " | ");
-        const auto prefix = std::strlen(text);
-        // All new 32-character fields fit completely. Legacy longer text is
-        // clipped only for this display and stays intact in the preset.
-        const auto length = std::min(std::strlen(detail), kNT_parameterStringSize - prefix - 1);
-        std::memcpy(text + prefix, detail, length);
-        text[prefix + length] = 0;
-    }
+    // New text is 32 characters; preserved legacy destinations also fit in 64 bytes.
+    std::strcpy(text, *value ? value : "-");
     return static_cast<int>(std::strlen(text));
 }
 void serialise(_NT_algorithm* self, _NT_jsonStream& stream) {
@@ -220,6 +310,7 @@ bool deserialise(_NT_algorithm* self, _NT_jsonParse& parse) {
     if (!patch_helper::readMap(algorithm.map, parse, algorithm.scratch)) return false;
     algorithm.session = {};
     algorithm.needsProjection = true;
+    algorithm.needsGray = true;
     return true;
 }
 void midiSysEx(const uint8_t* data, uint32_t size) {
@@ -251,6 +342,8 @@ constexpr _NT_factory makeFactory() {
     factory.step = step;
     factory.parameterChanged = parameterChanged;
     factory.draw = draw;
+    factory.hasCustomUi = hasCustomUi;
+    factory.customUi = customUi;
     factory.parameterUiPrefix = parameterUiPrefix;
     factory.parameterString = parameterString;
     factory.tags = kNT_tagUtility;

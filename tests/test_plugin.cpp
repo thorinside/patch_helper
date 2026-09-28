@@ -33,7 +33,10 @@ bool _NT_jsonParse::number(int& value) { return static_cast<JsonReader*>(refCon)
 bool _NT_jsonParse::string(const char*& value) { return static_cast<JsonReader*>(refCon)->string(value); }
 
 std::vector<std::string> drawn;
-void NT_drawText(int, int, const char* text, int, _NT_textAlignment, _NT_textSize) { drawn.emplace_back(text); }
+void NT_drawText(int, int y, const char* text, int, _NT_textAlignment, _NT_textSize) {
+    assert(y >= 21 && y <= 60); // Leave the firmware-owned top row clear.
+    drawn.emplace_back(text);
+}
 int NT_intToString(char* output, int32_t value) {
     char text[12];
     const auto result = std::to_chars(text, text + sizeof(text), value);
@@ -124,10 +127,15 @@ void testProtocolBounds() {
 int32_t NT_algorithmIndex(const _NT_algorithm*) { return 0; }
 void NT_updateParameterDefinition(uint32_t, uint32_t) {}
 void NT_updateParameterPages(uint32_t) {}
+std::array<bool, 231> grayed{};
+void NT_setParameterGrayedOut(uint32_t index, uint32_t p, bool gray) {
+    assert(index == 0 && p >= 7 && p < 7 + grayed.size());
+    grayed[p - 7] = gray;
+}
 
 uint32_t NT_parameterOffset() { return 7; }
 void NT_setParameterFromAudio(uint32_t index, uint32_t p, int16_t value) {
-    assert(index == 0 && p >= 7 && p < 7 + 3 + 2 * patch_helper::kNativeSockets);
+    assert(index == 0 && p >= 7 && p < 7 + 231);
     const_cast<int16_t*>(activeAlgorithm->v)[p - 7] = value;
     const auto* f = reinterpret_cast<const _NT_factory*>(pluginEntry(kNT_selector_factoryInfo, 0));
     f->parameterChanged(activeAlgorithm, p - 7);
@@ -187,7 +195,7 @@ int main(int argc, char** argv) {
     assert(pluginEntry(kNT_selector_numFactories, 0) == 1);
     _NT_algorithmRequirements req{};
     factory->calculateRequirements(req, nullptr);
-    assert(req.numParameters == 3 + 2 * patch_helper::kNativeSockets && req.dtc == 0 && req.dram == 0 && req.itc == 0);
+    assert(req.numParameters == 231 && req.dtc == 0 && req.dram == 0 && req.itc == 0);
     std::vector<std::max_align_t> memory((req.sram + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t));
     _NT_algorithmMemoryPtrs ptrs{reinterpret_cast<uint8_t*>(memory.data()), nullptr, nullptr, nullptr};
     auto* algorithm = factory->construct(ptrs, req, nullptr);
@@ -203,7 +211,7 @@ int main(int argc, char** argv) {
         assert(midiReply.size() > 20 && midiReply[20] == 0);
         assert(midiWireReply.front() == 0xf0 && midiWireReply.back() == 0xf7);
     }
-    int16_t values[3 + 2 * patch_helper::kNativeSockets] = {1, 0, 0};
+    int16_t values[231] = {1, 0, 0};
     auto& page = values[0];
     algorithm->v = values;
     const auto load = [&](const Json& json) {
@@ -258,9 +266,13 @@ int main(int argc, char** argv) {
     assert(algorithm->parameterPages->numPages == 20);
     for (int socket = 0; socket < 20; ++socket) {
         const auto& nativePage = algorithm->parameterPages->pages[socket];
-        assert(nativePage.numParams == 2 && nativePage.group == 1);
-        assert(nativePage.params[0] == 3 + 2 * socket);
-        assert(nativePage.params[1] == 4 + 2 * socket);
+        assert(nativePage.numParams == 4 && nativePage.group == 1);
+        assert(nativePage.params[0] == 171 + 2 * socket);
+        assert(nativePage.params[1] == 3 + 2 * socket);
+        assert(nativePage.params[2] == 4 + 2 * socket);
+        assert(nativePage.params[3] == 172 + 2 * socket);
+        assert(grayed[nativePage.params[0]] && grayed[nativePage.params[3]]);
+        assert(!grayed[nativePage.params[1]] && !grayed[nativePage.params[2]]);
     }
     assert(std::string(algorithm->parameterPages->pages[0].name) == "Input 1");
     assert(std::string(algorithm->parameterPages->pages[12].name) == "Output 1");
@@ -269,8 +281,8 @@ int main(int argc, char** argv) {
     assert(values[1] == 8 && values[3 + 2 * 19] == 4);
     values[3] = 0; factory->parameterChanged(algorithm, 3);
     char prefix[kNT_parameterUiPrefixSize]{};
-    factory->parameterUiPrefix(algorithm, 3 + 2 * 115, prefix);
-    assert(std::string(prefix) == "E12 Out 8 ");
+    factory->parameterUiPrefix(algorithm, 3 + 2 * 83, prefix);
+    assert(std::string(prefix) == "E8 Out 8 ");
     // Changing selection projects controls without overwriting either record.
     values[0] = 1; factory->parameterChanged(algorithm, 0);
     assert(values[1] == 0 && values[2] == 0);
@@ -322,7 +334,8 @@ int main(int argc, char** argv) {
     }
     auto expanded = save();
     // Old 13-bank maps remain readable without reserving rejected parameter counts.
-    expanded["patch_helper"]["expanders"].push_back({{"type", 0}, {"name", "Legacy"}});
+    for (int bank = patch_helper::kNativeExpanders; bank < patch_helper::kMaxExpanders; ++bank)
+        expanded["patch_helper"]["expanders"].push_back({{"type", 0}, {"name", "Legacy"}});
     for (int socket = patch_helper::kNativeSockets; socket < patch_helper::kMaxSockets; ++socket)
         expanded["patch_helper"]["connections"].push_back({{"socket", socket}, {"destination", ""}, {"colour", 0}, {"tag", 0}, {"group", ""}});
     assert(expanded["patch_helper"]["connections"].size() == patch_helper::kMaxSockets);
@@ -342,8 +355,8 @@ int main(int argc, char** argv) {
     assert(!load(invalidExpanded) && save() == expanded);
     factory->step(algorithm, nullptr, 0);
     assert(algorithm->parameters[0].max == patch_helper::kMaxSockets);
-    assert(algorithm->parameterPages->numPages == patch_helper::kNativeSockets + 1);
-    assert(std::string(algorithm->parameterPages->pages[116].name) == "Legacy bank 13");
+    assert(algorithm->parameterPages->numPages == 30);
+    assert(std::string(algorithm->parameterPages->pages[29].name) == "Other sockets");
     values[0] = 124; factory->parameterChanged(algorithm, 0);
     values[2] = 12; factory->parameterChanged(algorithm, 2);
     assert(save()["patch_helper"]["connections"][123]["tag"] == 12);
@@ -371,38 +384,124 @@ int main(int argc, char** argv) {
     textRow["group"] = "FX";
     textRow["colour"] = 9; textRow["tag"] = 1;
     assert(load(textMap)); factory->step(algorithm, nullptr, 0);
-    assert(algorithm->parameters[3].unit == kNT_unitHasStrings);
-    assert(algorithm->parameters[4].unit == kNT_unitHasStrings);
-    assert(format(3, 9) == "Purple | From Beads L");
-    assert(format(4, 1) == "1 | FX");
-    assert(format(3, 8) == "Blue | From Beads L"); // Format host preview value.
-    assert(format(4, 0) == "None | FX");
+    assert(algorithm->parameters[3].unit == kNT_unitEnum);
+    assert(algorithm->parameters[4].unit == kNT_unitNone);
+    assert(algorithm->parameters[171].unit == kNT_unitHasStrings);
+    assert(algorithm->parameters[171].min == 0 && algorithm->parameters[171].max == 0);
+    assert(format(171, 0) == "From Beads L");
+    assert(format(172, 0) == "FX");
+    assert(format(171, 999) == "From Beads L"); // Numeric dummy value cannot edit text.
     values[0] = 1;
-    assert(format(1, 9) == "Purple | From Beads L");
-    assert(format(2, 1) == "1 | FX");
+    assert(format(229, 0) == "From Beads L");
+    assert(format(230, 0) == "FX");
     assert(format(0, 1).empty() && format(-1, 0).empty());
     assert(format(req.numParameters, 0).empty());
+    assert(format(3, 9).empty() && format(4, 1).empty());
     textRow["destination"] = std::string(32, 'D');
     textRow["group"] = std::string(32, 'G');
     assert(load(textMap));
-    assert(format(3, 9) == "Purple | " + std::string(32, 'D'));
-    assert(format(4, 12) == "12 | " + std::string(32, 'G'));
+    assert(format(171, 0) == std::string(32, 'D'));
+    assert(format(172, 0) == std::string(32, 'G'));
     textRow["destination"] = std::string(63, 'L');
     assert(load(textMap));
-    assert(format(3, 9) == "Purple | " + std::string(54, 'L'));
+    assert(format(171, 0) == std::string(63, 'L'));
     assert(save()["patch_helper"]["connections"][0]["destination"].get<std::string>().size() == 63);
     textRow["destination"] = "Updated"; textRow["group"] = "New group";
     assert(load(textMap));
-    assert(format(3, 9) == "Purple | Updated");
-    assert(format(4, 1) == "1 | New group");
+    assert(format(171, 0) == "Updated");
+    assert(format(172, 0) == "New group");
+    const auto beforeDummy = save();
+    values[171] = 9; factory->parameterChanged(algorithm, 171);
+    assert(save() == beforeDummy && format(171, 9) == "Updated");
     // Numeric edits still affect only their own field.
     values[3] = 4; factory->parameterChanged(algorithm, 3);
     assert(save()["patch_helper"]["connections"][0]["destination"] == "Updated");
     assert(save()["patch_helper"]["connections"][0]["colour"] == 4);
+    // Eight banks retain independent numeric indices while the visible text
+    // pages follow the bank selector. Selecting a bank never edits cable data.
+    expanded["patch_helper"]["connections"][20]["destination"] = "Bank one";
+    expanded["patch_helper"]["connections"][76]["destination"] = "Bank eight";
+    expanded["patch_helper"]["connections"][76]["group"] = "Eighth group";
+    expanded["patch_helper"]["expanders"][7]["name"] = "Eight NTX";
+    assert(load(expanded));
+    values[227] = 1; factory->step(algorithm, nullptr, 0);
+    assert(format(211, 0) == "Bank one");
+    assert(!grayed[227] && grayed[228]);
+    const auto beforeBank = save();
+    values[227] = 8; factory->parameterChanged(algorithm, 227);
+    factory->step(algorithm, nullptr, 0);
+    assert(save() == beforeBank);
+    assert(values[0] == 77 && algorithm->parameters[227].max == 8);
+    assert(std::string(algorithm->parameterPages->pages[21].name) == "E8 Out 1");
+    assert(algorithm->parameterPages->pages[21].params[1] == 155);
+    assert(format(211, 0) == "Bank eight" && format(212, 0) == "Eighth group");
+    assert(format(228, 0) == "Eight NTX");
+    values[155] = 8; factory->parameterChanged(algorithm, 155);
+    assert(save()["patch_helper"]["connections"][76]["colour"] == 8);
+    assert(save()["patch_helper"]["connections"][20]["colour"] == 0);
+    values[0] = 124; factory->parameterChanged(algorithm, 0);
+    assert(format(229, 0) == "-" && format(230, 0) == "-");
+    auto oneBank = expanded;
+    oneBank["patch_helper"]["expanders"] = Json::array({expanded["patch_helper"]["expanders"][0]});
+    while (oneBank["patch_helper"]["connections"].size() > 28) oneBank["patch_helper"]["connections"].erase(oneBank["patch_helper"]["connections"].size() - 1);
+    assert(load(oneBank)); factory->step(algorithm, nullptr, 0);
+    assert(values[227] == 1 && algorithm->parameters[227].max == 1);
+    assert(algorithm->parameterPages->numPages == 29 && format(211, 0) == "Bank one");
     assert(load(fixture));
     page = 1;
     factory->draw(algorithm);
     assert(drawn[0] == "In 1");
+    // Connected-only viewport crosses input/output/expander gaps and is local UI state.
+    assert(factory->hasCustomUi(algorithm) == kNT_encoderR);
+    auto scrollMap = expanded;
+    for (auto& row : scrollMap["patch_helper"]["connections"]) row["destination"] = "";
+    for (int socket : {0, 5, 12, 20, 76, 83})
+        scrollMap["patch_helper"]["connections"][socket]["destination"] = "Connected";
+    assert(load(scrollMap)); factory->step(algorithm, nullptr, 0);
+    const auto labels = [&]() {
+        drawn.clear(); assert(!factory->draw(algorithm)); // Firmware draws its parameter row.
+        std::vector<std::string> result;
+        for (std::size_t i = 0; i < drawn.size(); i += 3) result.push_back(drawn[i]);
+        return result;
+    };
+    const auto turn = [&](int right, int left = 0) {
+        _NT_uiData ui{}; ui.encoders[0] = left; ui.encoders[1] = right;
+        factory->customUi(algorithm, ui);
+    };
+    turn(-128);
+    assert((labels() == std::vector<std::string>{"In 1", "In 6", "Out 1", "E1:1"}));
+    const auto beforeScroll = save();
+    const std::vector<int16_t> beforeValues(std::begin(values), std::end(values));
+    // Open a lease and compare the watch revision before/after scrolling.
+    request.assign(21, 0);
+    std::copy(std::begin(patch_helper::kPrefix), std::end(patch_helper::kPrefix), request.begin());
+    request[6] = 1; request[12] = 45; request[20] = 2;
+    factory->midiSysEx(request.data(), request.size());
+    const auto beforeRevision = patch_helper::readInteger(midiReply.data() + 16);
+    turn(0, 1);
+    assert(labels().front() == "In 1");
+    turn(1);
+    assert((labels() == std::vector<std::string>{"In 6", "Out 1", "E1:1", "E8:1"}));
+    turn(127);
+    assert((labels() == std::vector<std::string>{"Out 1", "E1:1", "E8:1", "E8:8"}));
+    turn(1); assert(labels().front() == "Out 1");
+    assert(save() == beforeScroll);
+    assert(beforeValues == std::vector<int16_t>(std::begin(values), std::end(values)));
+    request.resize(20); request[6] = 9;
+    factory->midiSysEx(request.data(), request.size());
+    assert(midiReply[20] == 0 && patch_helper::readInteger(midiReply.data() + 16) == beforeRevision);
+    // A new connection above the viewport retains the first visible socket.
+    scrollMap["patch_helper"]["connections"][1]["destination"] = "New";
+    assert(load(scrollMap)); assert(labels().front() == "Out 1");
+    // Removing rows clamps the final window; clearing all rows draws no placeholders.
+    scrollMap["patch_helper"]["connections"][83]["destination"] = "";
+    assert(load(scrollMap)); assert(labels().front() == "In 6");
+    for (auto& row : scrollMap["patch_helper"]["connections"]) row["destination"] = "";
+    assert(load(scrollMap)); assert(labels().empty());
+    turn(127); turn(-128); assert(labels().empty());
+    scrollMap["patch_helper"]["connections"][83]["destination"] = "Only";
+    assert(load(scrollMap)); assert((labels() == std::vector<std::string>{"E8:8"}));
+    assert(load(fixture)); turn(-128);
     const auto saved = save();
     const auto reject = [&](Json json) { assert(!load(json)); assert(save() == saved); };
     auto broken = fixture; broken["patch_helper"]["version"] = 2; reject(broken);
