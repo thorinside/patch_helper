@@ -352,6 +352,54 @@ int main(int argc, char** argv) {
     assert(defaults["patch_helper"]["connections"].size() == 20);
     assert(load(fixture));
     assert(save() == fixture);
+    // Firmware string requests display full text without changing property
+    // identity, numeric editing, selection or serialized data.
+    assert(factory->parameterString);
+    const auto format = [&](int parameter, int value) {
+        struct { char text[kNT_parameterStringSize]; char guard[8]; } buffer{};
+        std::fill(std::begin(buffer.guard), std::end(buffer.guard), 'X');
+        const auto before = save();
+        const int length = factory->parameterString(algorithm, parameter, value, buffer.text);
+        assert(length == static_cast<int>(std::strlen(buffer.text)));
+        for (char byte : buffer.guard) assert(byte == 'X');
+        assert(save() == before);
+        return std::string(buffer.text);
+    };
+    auto textMap = fixture;
+    auto& textRow = textMap["patch_helper"]["connections"][0];
+    textRow["destination"] = "From Beads L";
+    textRow["group"] = "FX";
+    textRow["colour"] = 9; textRow["tag"] = 1;
+    assert(load(textMap)); factory->step(algorithm, nullptr, 0);
+    assert(algorithm->parameters[3].unit == kNT_unitHasStrings);
+    assert(algorithm->parameters[4].unit == kNT_unitHasStrings);
+    assert(format(3, 9) == "Purple | From Beads L");
+    assert(format(4, 1) == "1 | FX");
+    assert(format(3, 8) == "Blue | From Beads L"); // Format host preview value.
+    assert(format(4, 0) == "None | FX");
+    values[0] = 1;
+    assert(format(1, 9) == "Purple | From Beads L");
+    assert(format(2, 1) == "1 | FX");
+    assert(format(0, 1).empty() && format(-1, 0).empty());
+    assert(format(req.numParameters, 0).empty());
+    textRow["destination"] = std::string(32, 'D');
+    textRow["group"] = std::string(32, 'G');
+    assert(load(textMap));
+    assert(format(3, 9) == "Purple | " + std::string(32, 'D'));
+    assert(format(4, 12) == "12 | " + std::string(32, 'G'));
+    textRow["destination"] = std::string(63, 'L');
+    assert(load(textMap));
+    assert(format(3, 9) == "Purple | " + std::string(54, 'L'));
+    assert(save()["patch_helper"]["connections"][0]["destination"].get<std::string>().size() == 63);
+    textRow["destination"] = "Updated"; textRow["group"] = "New group";
+    assert(load(textMap));
+    assert(format(3, 9) == "Purple | Updated");
+    assert(format(4, 1) == "1 | New group");
+    // Numeric edits still affect only their own field.
+    values[3] = 4; factory->parameterChanged(algorithm, 3);
+    assert(save()["patch_helper"]["connections"][0]["destination"] == "Updated");
+    assert(save()["patch_helper"]["connections"][0]["colour"] == 4);
+    assert(load(fixture));
     page = 1;
     factory->draw(algorithm);
     assert(drawn[0] == "In 1");

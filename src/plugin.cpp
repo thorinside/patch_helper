@@ -11,7 +11,7 @@
 
 namespace {
 // Keep the three preview-era parameter indices for saved mappings, but expose
-// only independent per-socket controls on the native pages.
+// independent per-socket controls and formatted text on the native pages.
 constexpr int kLegacyParameters = 3;
 constexpr int kParameterCount = kLegacyParameters + 2 * patch_helper::kNativeSockets;
 static_assert(kParameterCount <= 240);
@@ -29,8 +29,8 @@ struct Algorithm : _NT_algorithm {
 };
 constexpr _NT_parameter parameters[] = {
     {"First socket", 1, 20, 1, kNT_unitNone, 0, nullptr},
-    {"Cable colour", 0, patch_helper::kColourCount - 1, 0, kNT_unitEnum, 0, patch_helper::kColours},
-    {"Tag", 0, 12, 0, kNT_unitNone, 0, nullptr},
+    {"Cable colour", 0, patch_helper::kColourCount - 1, 0, kNT_unitHasStrings, 0, nullptr},
+    {"Tag", 0, 12, 0, kNT_unitHasStrings, 0, nullptr},
 };
 void socketName(char* name, int socket) {
     if (socket < 20) {
@@ -182,6 +182,36 @@ int parameterUiPrefix(_NT_algorithm*, int p, char* text) {
     std::strcat(text, " ");
     return static_cast<int>(std::strlen(text));
 }
+// A single property returns a complete string. Keep the established numeric
+// indices/ranges for mappings; the associated descriptive text is read-only.
+int parameterString(_NT_algorithm* self, int p, int value, char* text) {
+    if (p <= 0 || p >= kParameterCount) return 0;
+    const auto& algorithm = *static_cast<Algorithm*>(self);
+    const int socket = p < kLegacyParameters ? selectedSocket(algorithm)
+        : (p - kLegacyParameters) / 2;
+    if (socket >= algorithm.map.socketCount()) return 0;
+    const bool colour = p < kLegacyParameters ? p == 1
+        : (p - kLegacyParameters) % 2 == 0;
+    const auto& row = algorithm.map.connections[socket];
+    if (colour) {
+        std::strcpy(text, patch_helper::kColours[std::clamp(value, 0, patch_helper::kColourCount - 1)]);
+    } else if (value > 0) {
+        NT_intToString(text, std::clamp(value, 0, 12));
+    } else {
+        std::strcpy(text, "None");
+    }
+    const char* detail = colour ? row.destination : row.group;
+    if (*detail) {
+        std::strcat(text, " | ");
+        const auto prefix = std::strlen(text);
+        // All new 32-character fields fit completely. Legacy longer text is
+        // clipped only for this display and stays intact in the preset.
+        const auto length = std::min(std::strlen(detail), kNT_parameterStringSize - prefix - 1);
+        std::memcpy(text + prefix, detail, length);
+        text[prefix + length] = 0;
+    }
+    return static_cast<int>(std::strlen(text));
+}
 void serialise(_NT_algorithm* self, _NT_jsonStream& stream) {
     patch_helper::writeMap(static_cast<Algorithm*>(self)->map, stream);
 }
@@ -222,6 +252,7 @@ constexpr _NT_factory makeFactory() {
     factory.parameterChanged = parameterChanged;
     factory.draw = draw;
     factory.parameterUiPrefix = parameterUiPrefix;
+    factory.parameterString = parameterString;
     factory.tags = kNT_tagUtility;
     factory.serialise = serialise;
     factory.deserialise = deserialise;

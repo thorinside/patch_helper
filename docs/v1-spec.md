@@ -108,9 +108,15 @@ Each socket has its own parameter page: Input 1–12, Output 1–8, E1 Out 1–8
 subsequent banks. Page count changes automatically via `NT_updateParameterPages()`.
 Colour and tag use independent parameters. Saved parameter mappings retain
 preview indices 0–2, and per-socket colour/tag pairs at `3 + 2*N`, `4 + 2*N`.
-The current implementation reserves 235 parameters and supports those two
-fields on the native pages. The algorithm display shows socket, colour and
-destination; display clipping never truncates the saved destination.
+The current implementation reserves 235 parameters. Each Cable colour value
+returns `colour | destination`, and each Tag value returns `tag | group`, through
+`parameterString()` with `kNT_unitHasStrings`. Empty text omits the separator;
+tag 0 displays None. Both complete 32-character text fields fit the callback
+buffer. Colour/tag remain independently editable and mappable; text is read-only
+on the NT and updates from the current map whenever firmware asks for its value.
+The callback formats the supplied numeric value, including host previews.
+The algorithm display also shows socket, colour and destination; clipping of
+legacy longer text never truncates its saved value.
 
 **Owner decision, 2026-09-28:** the firmware author confirmed that native editable
 text properties are not exposed in the C++ SDK yet, and that the planned limit
@@ -122,15 +128,15 @@ limited to 32 characters for new edits in preparation for that API.
 The SDK's `parameterString(self, p, v, buffer)` callback returns an entire
 NULL-terminated value, not a single character; its buffer is at least 64 bytes.
 Use `kNT_unitHasStrings` for native formatted values until editable strings are
-supported. Preserve the existing independent socket pages. The exact placement
-of text within those pages remains to be settled against parameter capacity;
-this decision does not authorize replacing the pages with a shared selector.
+supported. Preserve the existing independent socket pages and their two numeric
+controls, with destination/group displayed alongside those controls. This does
+not introduce extra selector pages or remove expander capacity.
 
 Investigation on 2026-09-28 verified the diagnostic SysEx `0x53` receive path
 and `parameterString` / `0x50` readback, but that does not expose a native text
 editor. The connected v1.19.0beta build converts SDK units 18–99 to type 0.
 Native text editing is now a future firmware/SDK integration, not a current
-V1 acceptance requirement. Full native field display remains outstanding.
+V1 acceptance requirement. Native expander-name display remains outstanding.
 
 ## Synchronization and Lua events
 
@@ -205,7 +211,7 @@ indicator remains at the top left. Native sanitizer tests, ARM object
 inspection and strict-alignment Unicorn startup checks are separate from hardware
 acceptance. No hardware acceptance is inferred solely from those tests.
 
-Outstanding: native text-property display and field parity; end-of-chain
+Outstanding: native expander-name display; end-of-chain
 preset merge/lifecycle behavior; persistence of pending edits across editor/app
 lifecycle changes; wider firmware acceptance and production release review.
 

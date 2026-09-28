@@ -6,7 +6,7 @@ Started from Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`,
 **Disting NT physical connection map and Helper companion interface**.
 The owner authorized development on 2026-09-27 and named the as-built baseline
 **V1** on 2026-09-28. [v1-spec.md](v1-spec.md) records the current scope and
-remaining acceptance work, including native text-property display. The original
+remaining acceptance work, including native expander-name display. The original
 brainstorming capture remains in source-spec.md. V1 is not a production tag.
 
 The live workflow now includes preset serialization, SD companion loading/cache,
@@ -137,9 +137,10 @@ The native harness proves the callback payload, not that outer envelope.
 
 ## Remaining integration work
 
-See [V1](v1-spec.md) for current acceptance boundaries. Native text-property
-display is required. The owner accepts display-only text pending firmware/SDK
-support for native editing; no custom text editor is approved.
+See [V1](v1-spec.md) for current acceptance boundaries. Native destination/group
+text now uses `parameterString()` alongside the existing colour/tag values.
+Expander-name display remains open. The owner accepts display-only text pending
+firmware/SDK support for native editing; no custom text editor is approved.
 End-of-chain preset merging and preservation of pending field edits across
 editor/app disposal remain open. Gear sorting/group presentation and arbitrary
 GUID adapters are deferred. SD loading, caching, automatic field reconciliation,
@@ -205,3 +206,17 @@ separate from this physical-device evidence.
 Saving and recalling `Patch Pages Test` retained the 28 socket pages, E1 Out 8
 Blue/tag 7, and the original Input 1 Purple/tag 1. The test destination was
 cleared before saving. End-of-chain preset merging remains unverified.
+
+## Native text display verification (2026-09-28)
+
+The deployed ARM object SHA-256 is
+`83fdf3d1096e4db84b41ae9a4aedfc23412edd917791ffe5bb8795e4efd9f7c2`.
+Its SD readback matched the local object byte for byte. After restoring
+`Patch Pages Test`, native `0x50` reads returned `Purple | From Beads L`,
+`1 | FX`, `Red | From Beads R`, `None | FX`, `Blue | Clock`,
+`None | Timing`, `Blue | Clock FWD`, and `7 | Timing` for the matching
+native and expander properties. The physical NT parameter screen showed both
+formatted values on Input 1. This verifies display-only text, not native text
+editing. The existing page count, colour/tag indices and numeric ranges remain.
+
+![NT Input 1 properties with destination and group](evidence/native-socket-text.png)

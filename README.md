@@ -11,12 +11,15 @@ optional Tag (1–12), and group. An empty destination means unused. Clearing it
 preserves the other cable metadata. The SD-card Lua companion provides the Helper editor.
 New destinations, groups and expander names accept up to 32 printable ASCII
 characters. Older longer destinations remain intact until replaced.
-On-device text editing awaits SDK support; the current target is read-only
-text display on the existing socket pages.
+On-device text editing awaits SDK support. Destination and group are displayed
+alongside the existing native controls.
 
 The NT has one parameter page per socket: **Input 1–12**, **Output 1–8**,
 then **E1 Out 1–8** and subsequent expander banks, up to 12 banks. Each page has independent
-**Cable colour** and **Tag** controls. Tag 0 means none. Adding an expander in
+**Cable colour** and **Tag** controls. Their displayed values include the
+destination and group respectively: `Purple | From Beads L` and `1 | FX`.
+Text follows changes made in Helper; colour and tag remain editable on the NT.
+Tag 0 means none. Adding an expander in
 Helper adds eight pages on the NT automatically. The display keeps the native
 parameter line visible and shows cable records below it, following the last
 socket edited on the NT. Long destinations are clipped only on screen;
