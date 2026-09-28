@@ -452,7 +452,7 @@ int main(int argc, char** argv) {
     factory->draw(algorithm);
     assert(drawn[0] == "In 1");
     // Connected-only viewport crosses input/output/expander gaps and is local UI state.
-    assert(factory->hasCustomUi(algorithm) == kNT_encoderR);
+    assert(factory->hasCustomUi(algorithm) == (kNT_button1 | kNT_button4));
     auto scrollMap = expanded;
     for (auto& row : scrollMap["patch_helper"]["connections"]) row["destination"] = "";
     for (int socket : {0, 5, 12, 20, 76, 83})
@@ -464,11 +464,15 @@ int main(int argc, char** argv) {
         for (std::size_t i = 0; i < drawn.size(); i += 3) result.push_back(drawn[i]);
         return result;
     };
-    const auto turn = [&](int right, int left = 0) {
-        _NT_uiData ui{}; ui.encoders[0] = left; ui.encoders[1] = right;
+    const auto press = [&](uint16_t controls, uint16_t last = 0) {
+        _NT_uiData ui{}; ui.controls = controls; ui.lastButtons = last;
         factory->customUi(algorithm, ui);
     };
-    turn(-128);
+    const auto scroll = [&](int rows) {
+        for (int i = 0; i < std::abs(rows); ++i)
+            press(rows < 0 ? kNT_button1 : kNT_button4);
+    };
+    scroll(-128);
     assert((labels() == std::vector<std::string>{"In 1", "In 6", "Out 1", "E1:1"}));
     const auto beforeScroll = save();
     const std::vector<int16_t> beforeValues(std::begin(values), std::end(values));
@@ -478,13 +482,18 @@ int main(int argc, char** argv) {
     request[6] = 1; request[12] = 45; request[20] = 2;
     factory->midiSysEx(request.data(), request.size());
     const auto beforeRevision = patch_helper::readInteger(midiReply.data() + 16);
-    turn(0, 1);
+    _NT_uiData encoders{};
+    encoders.encoders[0] = 1; encoders.encoders[1] = 1;
+    factory->customUi(algorithm, encoders);
+    press(kNT_button4, kNT_button4); // Held buttons do not repeat every callback.
+    press(kNT_button1 | kNT_button4); // Opposing fresh presses cancel.
+    press(kNT_button2 | kNT_button3); // Other buttons retain firmware behavior.
     assert(labels().front() == "In 1");
-    turn(1);
+    scroll(1);
     assert((labels() == std::vector<std::string>{"In 6", "Out 1", "E1:1", "E8:1"}));
-    turn(127);
+    scroll(127);
     assert((labels() == std::vector<std::string>{"Out 1", "E1:1", "E8:1", "E8:8"}));
-    turn(1); assert(labels().front() == "Out 1");
+    scroll(1); assert(labels().front() == "Out 1");
     assert(save() == beforeScroll);
     assert(beforeValues == std::vector<int16_t>(std::begin(values), std::end(values)));
     request.resize(20); request[6] = 9;
@@ -498,10 +507,10 @@ int main(int argc, char** argv) {
     assert(load(scrollMap)); assert(labels().front() == "In 6");
     for (auto& row : scrollMap["patch_helper"]["connections"]) row["destination"] = "";
     assert(load(scrollMap)); assert(labels().empty());
-    turn(127); turn(-128); assert(labels().empty());
+    scroll(127); scroll(-128); assert(labels().empty());
     scrollMap["patch_helper"]["connections"][83]["destination"] = "Only";
     assert(load(scrollMap)); assert((labels() == std::vector<std::string>{"E8:8"}));
-    assert(load(fixture)); turn(-128);
+    assert(load(fixture)); scroll(-128);
     const auto saved = save();
     const auto reject = [&](Json json) { assert(!load(json)); assert(save() == saved); };
     auto broken = fixture; broken["patch_helper"]["version"] = 2; reject(broken);

@@ -255,3 +255,19 @@ Physical right-encoder operation remains an owner acceptance check.
 Checks passed: native ASan/UBSan tests, cppcheck, ARM imports/PIC inspection,
 and construction/first draw at two emulated load addresses with strict alignment.
 The matching Helper branch passed all 3924 tests and analysis without issues.
+
+
+### Control correction: use buttons, preserve the encoders
+
+The owner found that claiming the right encoder prevented normal native parameter
+editing. This supersedes the encoder proposal and its pending acceptance above.
+Only `kNT_button1 | kNT_button4` are now claimed: button 1 scrolls up and button 4
+scrolls down on press edges. Held buttons do not repeat, and simultaneous presses
+cancel. Both encoders remain entirely firmware-owned. Native tests cover button
+edges, held/other buttons, encoder input being ignored, bounds and map/revision
+preservation. Physical button operation remains an owner acceptance check.
+
+The corrected object has SHA-256 `100ccd085f866e0a5c5a6066bb85f2d56b38550b7c11163708a18e11c40d6f92`. Upload used a fresh verified backup
+`/presets/PH 0928 112251.json`; SD object readback and preset restoration succeeded.
+Native sanitizer, static analysis, ARM inspection and two-address strict-alignment
+startup checks passed again.

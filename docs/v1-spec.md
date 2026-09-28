@@ -158,9 +158,11 @@ baselines 21, 34, 47 and 60. Each shows socket label, colour and destination.
 A nonempty destination defines a connected socket; unused rows are omitted even
 if they retain a colour or tag. An empty map leaves the list area blank.
 
-Only the right encoder is overridden: it scrolls one connected row per detent,
-clamping at each end so the last window stays filled when at least four records
-exist. Other controls remain firmware-owned. The first visible socket anchors
+Only buttons 1 and 4 are overridden: button 1 scrolls up and button 4 scrolls
+down, one connected row per new press. Holding a button does not repeat. Pressing
+both together makes no change. Clamp at each end so the last window stays filled
+when at least four records exist. Both encoders and all other controls remain
+firmware-owned, preserving native parameter editing. The first visible socket anchors
 the viewport across map updates, clamped when rows disappear. Scrolling changes
 only local view state, not native parameter values, map content or revision.
 All sockets remain available in the native pages and Helper table for editing.
@@ -232,9 +234,11 @@ constraint, not a timeless SDK guarantee.
 
 The revised four-field layout was exercised on the device for Input 1 and E8
 Out 1 using an eight-bank test map; the working preset was restored afterward.
-The connected-list screen clears the native top row. Right-encoder scrolling,
-filtering and unchanged map/revision are covered by native callback tests;
-physical encoder operation remains an owner acceptance check.
+The connected-list screen clears the native top row. The owner found that
+claiming the right encoder blocked native parameter editing; that approach was
+removed in favor of buttons 1 and 4. Button scrolling, filtering, bounds and
+unchanged map/revision are covered by native callback tests; physical button
+operation remains an owner acceptance check.
 
 The action dialog is covered by Flutter tests for all four choices, cancel and
 Escape, bank limits, invalid Lua schemas, stale actions and stable geometry.

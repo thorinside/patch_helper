@@ -237,12 +237,15 @@ int connectedWindow(Algorithm& algorithm, std::array<int, patch_helper::kMaxSock
     algorithm.firstVisibleSocket = count ? sockets[first] : 0;
     return first;
 }
-uint32_t hasCustomUi(_NT_algorithm*) { return kNT_encoderR; }
+uint32_t hasCustomUi(_NT_algorithm*) { return kNT_button1 | kNT_button4; }
 void customUi(_NT_algorithm* self, const _NT_uiData& data) {
+    const auto pressed = data.controls & ~data.lastButtons;
+    const int delta = ((pressed & kNT_button4) ? 1 : 0) - ((pressed & kNT_button1) ? 1 : 0);
+    if (!delta) return;
     auto& algorithm = *static_cast<Algorithm*>(self);
     std::array<int, patch_helper::kMaxSockets> sockets{};
     int count;
-    connectedWindow(algorithm, sockets, count, data.encoders[1]);
+    connectedWindow(algorithm, sockets, count, delta);
 }
 bool draw(_NT_algorithm* self) {
     auto& algorithm = *static_cast<Algorithm*>(self);

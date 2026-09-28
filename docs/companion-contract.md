@@ -134,8 +134,9 @@ edited native row for Lua callbacks. Preset deserialization invalidates the
 lease and reprojects controls. Native text is shown in separate greyed-out
 properties; editing remains in Helper until SDK support arrives.
 
-The NT custom view independently scrolls connected sockets with the right
-encoder below the native parameter row. This changes no map or property state.
+The NT custom view independently scrolls connected sockets with buttons 1 (up)
+and 4 (down) below the native parameter row. Both encoders remain firmware-owned.
+This changes no map or property state.
 
 ## Lua choice dialogs
 

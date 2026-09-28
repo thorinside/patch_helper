@@ -24,7 +24,8 @@ Older maps with more than eight banks retain all their records and can use
 old mappings for higher banks need reassignment to the compatibility controls.
 
 The custom NT view keeps the native parameter row at the top and shows up to
-four connected sockets below it. Turn the **right encoder** to scroll the list.
+four connected sockets below it. Press **button 1** to scroll up or **button 4** to scroll down. Both encoders
+remain available to the native parameter editor.
 Sockets with a blank destination are omitted here; every socket remains available
 in the parameter pages and Helper table. Scrolling does not change the patch.
 
