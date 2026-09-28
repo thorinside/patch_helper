@@ -59,7 +59,19 @@ physical cable detection. Keep colour names beside swatches and Tag labels.
 The socket minimap uses numbered dots and a visible selected state. Selecting
 a dot scrolls to and highlights its table row; reduced-motion settings disable
 the scroll animation. Empty destinations show as unused. Tag is a plain
-integer field, 1–12 or blank, with validation beside the affected row.
+integer field, 1–12 or blank, with validation that does not shift the row.
+
+Live NT socket selection uses the same highlight and scroll behavior without
+moving keyboard focus. Pending field synchronization suspends automatic row
+navigation. Valid edits reconcile automatically; no unsent-edit or manual
+reload workflow is exposed.
+
+Layout stability is mandatory. A fixed-size sync indicator remains at the top
+left, with error details in tooltips or overlays. A fixed-height action bar
+places Add expander at the top right. Lua declares its dialog title, model
+choices and Cancel label; Flutter renders the Material dialog and owns keyboard
+focus and accessibility. The table stays fixed behind the modal. No permanent
+model dropdown or instructional paragraph occupies the editor.
 
 ## Do's and Don'ts
 
@@ -69,7 +81,8 @@ for this round along with current theme source. They establish shell and control
 character. Their chosen seed and old algorithm content are not new requirements.
 Discard the black capture margins outside the app when composing prototypes.
 
-Current native editor captures are in Helper's
-`docs/evidence/patch-helper/editor-desktop.png` and `editor-compact.png`.
-Their cable names are sample data; the captures demonstrate the Helper layout,
-not physical-device acceptance.
+Current editor captures are in Helper's `docs/evidence/patch-helper/`:
+`editor-desktop.png`, `editor-compact.png`, and `expander-dialog.png`.
+Their cable names are illustrative and they prove widget rendering, not hardware
+acceptance. `editor-name-conflict.png` is historical evidence of the removed
+manual Apply interaction and must not guide new UI.

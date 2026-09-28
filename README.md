@@ -1,46 +1,87 @@
 # Patch Helper
 
-A physical cable reference for disting NT. It records intended connections;
-it does not detect cables, route signals, or modify audio/CV.
+A physical cable reference for disting NT, saved with your preset. Record what
+is plugged into each socket, then look it up on the NT or edit it in NT Helper.
+Connections are entered manually; Patch Helper does not detect cables or change
+audio, CV, or routing.
 
-**Development preview — requires the matching NT Helper branch; not a production release.**
+**Development preview.** Tested on disting NT firmware **1.19.0beta**. Other
+firmware versions have not been verified. The companion editor requires the
+[NT Helper development work in PR #152](https://github.com/No-Such-Device/nt_helper/pull/152),
+including its dependent companion changes; it is not yet in a released Helper build.
 
-The plug-in displays a preset-owned map containing the twelve native
-inputs, eight native outputs, and manually added eight-output expanders. Each socket has a destination, cable colour,
-optional Tag (1–12), and group. An empty destination means unused. Clearing it
-preserves the other cable metadata. The SD-card Lua companion provides the Helper editor, including the map title.
-On-device text editing remains pending.
+## Install
 
-The NT screen shows four rows at a time. Use **View → First socket** to scroll.
-Unused sockets remain visible. Long destinations are clipped on screen only;
-the saved text is retained. Tags and groups are stored but are not yet displayed.
+Download the plugin ZIP from [Releases](https://github.com/thorinside/patch_helper/releases).
+Copy its `programs` folder to the root of the NT SD card, preserving these paths:
 
-## Development preview
+```text
+programs/plug-ins/patch_helper.o
+programs/helper/ThPh.lua
+```
 
-The object is built against the pinned official API v13. Firmware compatibility,
-physical-device loading, preset recall, and end-of-chain preset behavior still
-need device verification. No firmware compatibility claim is made from a
-successful ARM build alone.
+Restart the NT after copying, then add **Patch Helper** to your preset and turn
+Bypass off. The matching Helper development build can also install this ZIP
+through its Gallery installer, placing both files in their respective folders.
 
-For owner testing, the built `plugins/patch_helper.o` belongs under
-`programs/plug-ins/` on the SD card. Restart or remount the card, then select
-**Patch Helper** from Add algorithm. New instances show unused sockets. The
-[fixture](tests/fixtures/native-map.json) exercises populated maps in native
-tests. Before editing a hardware preset, export a preset containing the plugin
-and confirm where the firmware embeds its custom serialization object; that
-outer preset envelope has not yet been verified on a device.
+The Lua file stays on the SD card. Helper downloads, caches, and runs it on the
+computer to describe the editor; Flutter renders the controls. The NT runs the
+C++ plugin and holds the connection data. The companion is not a Lua algorithm
+to add to the NT preset.
 
-Install `helper/ThPh.lua` at the SD-card root alongside the `programs`
-folder. In NT Helper, open the Patch Helper slot and choose **Load SD companion**.
-Helper downloads `/helper/ThPh.lua` and runs it on the computer.
-The file defines the straight table and clickable socket minimap. Apply each
-edited row or press Enter, then use the normal **Save preset** action to keep
-acknowledged changes on the NT. Reload after any uncertain write.
+## In NT Helper
 
-Add NTX-8CV, ES-5, ESX-8GT, or ESX-8CV from the dropdown. Each adds eight physical
-output records. Expander section actions rename instances and move their whole
-banks, retaining cable records. This does not configure an expander's electronic
-connection or change routing. See the [companion contract](docs/companion-contract.md)
-and [live map protocol](docs/live-map-protocol.md).
-See [development notes](docs/development.md) for build commands, format details,
-the originating Substrate spec, and the remaining integration work.
+Select the Patch Helper slot; its editor loads automatically. Edit the table in
+socket order: **12 inputs**, **8 outputs**, then **8 outputs per expander**.
+
+| Field | Values and defaults |
+| --- | --- |
+| Destination | Up to 32 printable ASCII characters; initially blank (unused) |
+| Cable colour | None, Black, White, Grey, Red, Orange, Yellow, Green, Blue, Purple, Pink, Brown; initially None |
+| Tag | Blank or an integer from 1 to 12; initially blank |
+| Group | Up to 32 printable ASCII characters; initially blank |
+
+For example, record `From Beads L`, Purple, tag `1`, and group `FX` on Input 1.
+Clearing a destination marks the socket unused while retaining its other fields.
+Group is a text label; it does not sort or regroup the table.
+
+Click a coloured dot in **Sockets** to scroll to and highlight its row. Use **+**
+at the top right to add an expander: NTX-8CV, ES-5, ESX-8GT, or ESX-8CV. You can
+record up to **eight expanders**, including repeated types. Section controls
+rename them (up to 32 printable ASCII characters) or move whole banks with their
+connection records. Adding a bank does not configure the physical expander.
+
+Valid edits synchronize automatically. Changes made on the NT also appear in
+Helper while the editor is active. Hover over the dot beside the slot name for
+sync status or error details. Wait for **Up to date** before leaving the editor,
+then **save the NT preset** to retain changes when it is recalled. Pending edits
+are not retained after the editor closes.
+
+## On the NT
+
+The custom display shows a channel/parameter/value strip above four socket
+rows, with destination, colour, tag, and group on each line.
+
+| Control | Action |
+| --- | --- |
+| Pot 1 or encoder 1 | Select a socket |
+| Pot 2 | Select Cable colour or Tag |
+| Pot 3 or encoder 2 | Change its value |
+
+Selection stays visible and brightens the channel label. Unused sockets can
+still be selected and edited; the selected unused socket appears on the bottom
+row. Long text is shortened on this display without changing the stored value.
+Pot 3 uses pickup after selection changes to avoid value jumps.
+
+The normal parameter pages show **Destination**, **Cable colour**, **Tag**, and
+**Group** for each socket. Text is greyed out and read-only on the NT; edit it in
+Helper. Tag `0` means no tag. **Expander bank** selects which bank's eight socket
+pages are shown. Helper displays all banks together.
+
+## Preview limits
+
+Regular preset save/recall has been checked on hardware. End-of-chain preset
+merging remains unverified. If the editor fails to load, check the Helper build
+and exact `programs/helper/ThPh.lua` path; it retries automatically after errors.
+
+[Development and build notes](https://github.com/thorinside/patch_helper/blob/main/docs/development.md) · [V1 specification](https://github.com/thorinside/patch_helper/blob/main/docs/v1-spec.md)

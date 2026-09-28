@@ -2,8 +2,11 @@ name: Verify development build
 on:
   push:
     branches: ['**']
+    tags: ['v*-preview.*']
   pull_request:
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -13,19 +16,39 @@ jobs:
           submodules: recursive
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi libstdc++-arm-none-eabi-dev nlohmann-json3-dev cppcheck
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ARM startup test dependencies
+        run: python3 -m pip install -r tools/requirements-arm-smoke.txt
       - name: Native tests and ARM inspection
         run: make verify
       - name: Static analysis
         run: make static-check
       - name: Package development preview
-        run: |
-          mkdir -p build/package/programs/plug-ins build/package/helper
-          cp plugins/patch_helper.o build/package/programs/plug-ins/
-          cp helper/ThPh.lua build/package/helper/
-          cp README.md build/package/
-          cd build/package
-          zip -r ../../patch_helper-preview.zip .
+        run: make package
       - uses: actions/upload-artifact@v4
         with:
           name: patch-helper-development-preview
-          path: patch_helper-preview.zip
+          path: build/patch_helper-preview.zip
+          if-no-files-found: error
+  prerelease:
+    if: github.ref_type == 'tag' && contains(github.ref_name, '-preview.')
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: patch-helper-development-preview
+          path: build
+      - name: Publish verified development preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: >-
+          gh release create "$RELEASE_TAG" build/patch_helper-preview.zip
+          --verify-tag --prerelease --title "Patch Helper $RELEASE_TAG"
+          --notes-file .github/prerelease-notes.md

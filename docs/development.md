@@ -1,31 +1,63 @@
 # Development contract
 
+For installation and current controls, see the [user guide](../README.md).
+This document includes dated investigation notes and superseded UI experiments;
+the [V1 spec](v1-spec.md) records the current baseline.
+
 ## Source and scope
 
 Started from Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`,
 **Disting NT physical connection map and Helper companion interface**.
-The user authorized beginning development in this repository and supporting
-work in `../nt_helper` on 2026-09-27. The spec remains an unapproved discovery
-draft; this slice does not imply that its remaining decisions are settled.
+The owner authorized development on 2026-09-27 and named the as-built baseline
+**V1** on 2026-09-28. [v1-spec.md](v1-spec.md) records the current scope and
+remaining acceptance work, including lifecycle acceptance. The original
+brainstorming capture remains in source-spec.md. V1 is not a production tag.
 
-This first slice proves a preset-data boundary: native socket inventory,
-validation, atomic decoding, serialization, an NT display, and matching Helper
-code. It does not yet provide an end-to-end patch editing workflow.
+The live workflow now includes preset serialization, SD companion loading/cache,
+automatic field reconciliation, the table/minimap, native colour/tag pages,
+and dynamic page updates. See the V1 spec for measured hardware evidence.
+
+## Packaging
+
+`make package` builds and inspects the ARM object, then creates
+`build/patch_helper-preview.zip` with exactly these files:
+
+```text
+programs/plug-ins/patch_helper.o
+programs/helper/ThPh.lua
+README.md
+```
+
+CI uses the same command. Tags matching `v*-preview.*` publish a GitHub
+prerelease only after verification succeeds, using that run's ZIP artifact.
+Production tags are not published by this workflow.
+Release ZIPs must retain both SD-relative paths;
+`programs/helper/ThPh.lua` is a companion dependency, not a Lua algorithm.
+The Helper installer support is in
+[PR #152](https://github.com/No-Such-Device/nt_helper/pull/152), based on its
+companion development branch. No released Helper version is claimed here.
 
 ## Verified API findings
 
 The official [distingNT_API](https://github.com/expertsleepersltd/distingNT_API)
 is pinned at `9aeda6d41484815b80416b903a564510da6026cd` (API v13).
 `_NT_factory` exposes `serialise`, `deserialise`, and `parameterString`.
-The last callback formats numeric parameters; it is not an arbitrary writable
-string property. There is no factory callback for native string editing in
-this revision. Preset callbacks support custom state, and `midiSysEx` provides
-the custom USB transport specified in [live-map-protocol.md](live-map-protocol.md).
+The last callback supplies display text, as demonstrated by `examples/gain.cpp`.
+The firmware's `0x53` Set string parameter value message reaches the plug-in's
+`midiSysEx` callback: a handler can store the text and return it through
+`parameterString` when `0x50` requests the value. This was verified on hardware
+on 2026-09-28. It does not call `parameterChanged` on the diagnostic plug-in.
+Preset callbacks support custom state, and `midiSysEx` also provides the custom
+USB transport specified in [live-map-protocol.md](live-map-protocol.md).
 
 Helper has a built-in algorithm string-write path. Its bundled Lua controllers
 are pure projections of immutable slot snapshots and currently expose numeric
-controls. Neither fact demonstrates arbitrary plug-in string writes or shared
-state. Do not add a string widget and claim it solves this limitation.
+controls. The remaining native-editor issue is the property type conversion:
+declaring SDK unit `18` produced firmware-reported unit `0` in the probe,
+while the built-in Mixer reports `18` for its editable channel name.
+See [native-text-investigation.md](native-text-investigation.md) for the
+reproducer and the distinction between working string transport and unresolved
+native editor access.
 
 ## Prototype decisions
 
@@ -40,11 +72,12 @@ state. Do not add a string widget and claim it solves this limitation.
   fields: `socket`, `destination`, `colour`, `tag`, `group`.
 - Colour IDs 0–11: None, Black, White, Grey, Red, Orange, Yellow, Green, Blue,
   Purple, Pink, Brown. Tag 0 means absent; 1–12 are the optional visible tags.
-- Title/destination buffers are 64 bytes including terminator, aligned with
-  the API's 64-byte display-string boundary. Group buffers are 32 bytes.
-  Printable ASCII only in this preview; these are explicit prototype memory
-  and display choices, not claimed firmware text limits. Revisit before UI
-  design and release. Both implementations reject unsupported input.
+- New destination, group and expander-name edits accept 32 printable ASCII
+  characters. Group/name buffers are 33 bytes including the terminator.
+  Destination/title storage remains 64 bytes to preserve preview presets.
+  An unchanged long destination may accompany edits to other fields; replacing
+  it requires at most 32 characters. Both implementations reject unsupported
+  input without truncation.
 - Empty destination means unused; metadata remains intact. Groups are stored
   without providing grouping UI yet. The palette and retention policy remain
   reviewable development defaults, not owner-approved spec decisions.
@@ -64,6 +97,7 @@ equivalent). No JSON library is linked into the ARM object.
 
 ```sh
 git submodule update --init
+python3 -m pip install -r tools/requirements-arm-smoke.txt
 make verify
 # Override only when headers are outside the compiler's normal search path:
 make test JSON_INCLUDE=/custom/include
@@ -77,12 +111,45 @@ does not prove firmware parser or physical preset lifecycle behavior.
 
 `make inspect` verifies ELF32 little-endian ARM relocatable output, exported
 `pluginEntry`, and an allowlist of runtime and pinned API imports. Section
-sizes and demangled imports are printed for review. `step` does no work;
-deserialization uses a temporary map on the control-side stack (about 2 KiB).
+sizes and demangled imports are printed for review. `step` projects native
+controls when needed and never reads or writes the audio/CV buffer.
+Deserialization uses the instance-owned scratch map, not a whole map on stack.
+
+`make arm-smoke` runs the built ARM object under Unicorn with strict data
+alignment checks, explicit host-function stubs, halfword-aligned parameter
+storage, and both zeroed and poisoned instance memory. It runs at two code/data
+address layouts and rejects instance reads/writes beyond the declared SRAM size,
+including accesses performed by stubbed `memcpy` and `memset`. It exercises construction,
+initial parameter callbacks, the first `step`, and `draw`. This is not an NT
+firmware/ELF-loader emulator and does not replace hardware acceptance.
+
+The 2026-09-27 build-flags audit compared the skill's `templates/Makefile` and
+pinned API `examples/Makefile`: Cortex-M7, FPv5-D16 hard float, Thumb, `-Os`,
+`-fPIC`, no RTTI/exceptions, function/data sections, and no unwind tables.
+C++17 is required by our source; a single compilation unit produces the
+relocatable object directly with `-c`, matching the upstream example approach.
+`-mno-unaligned-access` is an additional hardware safeguard: the earlier object
+failed the ARM startup test while reading its default title with an unaligned
+word load. Makefile changes invalidate the hardware object to prevent stale
+flags. The import allowlist is observed compatibility, not a complete firmware
+export catalogue; the device reported `memcmp` as unavailable.
+
+The follow-up allocation/PIC audit found no heap allocation in the ARM object.
+`requirements()` declares the entire instance, including both maps and mutable
+parameter definitions. Placement `new` initializes that host-supplied block;
+it does not allocate from a heap. The hardware translation unit rejects builds
+without `-fPIC`. A colour table previously had external inline linkage, producing
+GOT relocations that the GNU linker in the smoke test resolved automatically.
+The table now has internal linkage, retaining PIC while eliminating the GOT.
+Object inspection rejects GOT dependencies and unexpected imports (including
+heap allocators). The previous alignment build still crashed on the physical NT;
+GOT elimination is a loader-compatibility hypothesis, not confirmed causation.
+
 `make static-check` runs cppcheck. It suppresses only two warning categories
 in the unmodified upstream headers: host-owned aggregate members without a
 constructor, and the upstream private non-explicit JSON-stream constructor.
-Plugin warnings remain errors. No production release is created by CI.
+Plugin warnings remain errors. CI publishes only explicitly tagged development
+prereleases, never a production release.
 
 The fixture is also stored in nt_helper at
 `test/fixtures/patch_map/native-map.json`. Keep both copies identical when the
@@ -93,24 +160,18 @@ contract. Confirm the firmware's actual custom-data envelope from an exported
 device preset before wiring this codec into user-facing preset operations.
 The native harness proves the callback payload, not that outer envelope.
 
-## Next integration slices
+## Remaining integration work
 
-1. Verify the revision-2 USB bridge on hardware: callback dispatch, USB reply
-   delivery, preset replacement, and dirty/preset-save semantics. Automated
-   tests cover wire compatibility, conflicts, and interrupted transfers.
-2. Implement the NT text-entry workflow against real API capabilities; expose
-   title/destination/metadata edits and retain native preset ownership.
-3. Add Helper state snapshots and host-owned declarative write actions, then
-   the connection-map editor (gear/socket views). Avoid embedding raw MIDI or
-   a mutable second state store in Lua.
-4. Resolve expander models/topology, naming, limits, sorting, grouping UI, and
-   ordinary versus end-of-chain preset behavior with the owner.
-5. Treat SD-card companion discovery/execution as a separate framework slice:
-   manifest/version compatibility, trust, isolated execution budgets, loading,
-   removal, and failure fallback. Existing bundled controllers do not provide
-   a sandbox for arbitrary downloaded Lua.
-
-No production tag, device deployment, or Substrate approval has been performed.
+See [V1](v1-spec.md) for current acceptance boundaries. Native destination/group
+text now uses separate greyed-out `parameterString()` properties. Eight expander
+banks share one set of eight visible socket pages, selected on Expander bank;
+colour/tag indices remain independent and the bank name is also displayed. The owner accepts display-only text pending
+firmware/SDK support for native editing; no custom text editor is approved.
+End-of-chain preset merging and preservation of pending field edits across
+editor/app disposal remain open. Gear sorting/group presentation and arbitrary
+GUID adapters are deferred. SD loading, caching, automatic field reconciliation,
+and regular preset recall now have implementation and test/device evidence.
+No production tag or Substrate readiness approval is implied by this baseline.
 
 ## Editor revision supersedes the initial-slice limitations
 
@@ -121,6 +182,199 @@ per instance. Moves preserve each bank's cable data. The map and deserialization
 scratch space are per-instance host-allocated SRAM, about 27 KiB combined.
 ARM stack inspection found deserialization at 48 bytes plus its bounded parser
 calls (largest individual frame 320 bytes), not a full expanded map on stack.
-The audio callback only updates the First socket parameter range when inventory
+The audio callback updates native page count and the legacy selector range when inventory
 changes; it leaves all audio/CV buffers untouched. Older initial-slice notes
 above describe revision 1 and must not be used to defer the Lua companion again.
+
+
+## Owner hardware check, 2026-09-27
+
+The owner confirmed that revision `275e282` loads, enables, and no longer
+crashes the NT. Loading the companion then timed out in the plug-in handshake.
+A direct SD download confirmed `/programs/helper/ThPh.lua` matched the repository
+source exactly. The reply omitted `F0`; the native host stub had incorrectly
+accepted that. Tests now require the opening delimiter and compare complete
+wire frames. The corrected callback also accepts independently retained input
+delimiters. Companion/map round-trip acceptance remains a separate check.
+
+
+## Per-socket native pages
+
+The native editor exposes four separate fields per socket: Destination, Cable
+colour, Tag and Group. The two text fields are fixed-value, greyed-out string
+properties. Twenty native socket pages remain permanent; an Expander bank page
+selects one of eight banks for the following eight socket pages. This uses 231
+parameters, with independent colour/tag indices for all 84 sockets. Old maps
+beyond eight banks retain their data and an Other sockets compatibility page.
+Mappings through bank eight retain their indices; older higher-bank mappings
+need reassignment because their indices now hold text properties.
+
+Definitions and page arrays are instance-owned SRAM reserved up front.
+`NT_updateParameterPages()` notifies the host when inventory or bank selection
+changes. Native and ARM startup tests cover callbacks, page indices, independent
+rows, bank bounds, greyed-out strings and host notification.
+
+## Connected-device verification, 2026-09-27
+
+On v1.19.0beta (Sep 16 2026), controlled builds with identical instance storage
+accepted 240 plug-in parameters and rejected 241, 242, 243, 247, 248, 249 and
+251. The 251-parameter build was also rejected in an empty preset. Moving the
+instance to DRAM did not resolve it. These are observed firmware limits, not a
+guarantee for other firmware. At that stage the build used 235 parameters plus
+the firmware Bypass parameter and new maps stopped at 12 banks; the existing 13-bank wire
+and preset format is retained, with a selector/colour/tag compatibility page
+for old maps. No records are silently truncated.
+
+The final object loaded with the three existing built-in algorithms, restored
+the saved cable colours, and ran with Bypass Off. Adding an NTX-8CV in the live
+Helper editor changed the device's page response from 20 to 28 socket pages
+(plus its standard Algorithm page) without reconstructing the algorithm.
+Writing E1 Out 8 Tag = 7 and Cable colour = Blue through native parameter writes
+updated the Lua-rendered row and minimap automatically. Editing its destination
+in Helper appeared on the NT display without Apply. Native/ARM checks remain
+separate from this physical-device evidence.
+
+Saving and recalling `Patch Pages Test` retained the 28 socket pages, E1 Out 8
+Blue/tag 7, and the original Input 1 Purple/tag 1. The test destination was
+cleared before saving. End-of-chain preset merging remains unverified.
+
+## Native text display verification (2026-09-28)
+
+The deployed ARM object SHA-256 is
+`83fdf3d1096e4db84b41ae9a4aedfc23412edd917791ffe5bb8795e4efd9f7c2`.
+Its SD readback matched the local object byte for byte. After restoring
+`Patch Pages Test`, native `0x50` reads returned `Purple | From Beads L`,
+`1 | FX`, `Red | From Beads R`, `None | FX`, `Blue | Clock`,
+`None | Timing`, `Blue | Clock FWD`, and `7 | Timing` for the matching
+native and expander properties. The physical NT parameter screen showed both
+formatted values on Input 1. This verifies display-only text, not native text
+editing. The existing page count, colour/tag indices and numeric ranges remain.
+
+![NT Input 1 properties with destination and group](evidence/native-socket-text.png)
+
+
+## Eight-bank field pages and connected list (2026-09-28)
+
+The production layout now has 231 plugin parameters plus Bypass. On the connected
+NT, Input 1 displayed four separate properties. Loading an eight-bank test map,
+selecting Bank 8, and reading the string properties returned `Bank eight CV 1`,
+`Bank eight`, and expander name `NTX 8`. The parameter screen displayed E8 Out 1
+with all four fields. This tests recorded banks, not eight attached expanders.
+The working four-slot preset was restored afterward.
+
+![Four native fields](evidence/native-four-fields.png)
+![Eighth expander bank](evidence/native-bank-eight.png)
+
+The following connected-list build was uploaded and read back byte for byte:
+SHA-256 `4a9306eae18de7e7adf1cb637d9b8368ba3b41f523c8165e2858534bc52f6b02`.
+The saved preset was backed up separately as `/presets/PH 0928 111756.json`
+before upload, then restored as Patch Pages Test. The NT screen confirms the
+native parameter row remains unobstructed above baselines 21, 34, 47 and 60.
+The custom view claims only the right encoder and filters blank destinations.
+Native callback tests cover scrolling over socket gaps, both bounds, insertion,
+removal, empty maps, unchanged parameter values and unchanged map revision.
+Physical right-encoder operation remains an owner acceptance check.
+
+![Connected list below native editor](evidence/native-connected-list.png)
+
+Checks passed: native ASan/UBSan tests, cppcheck, ARM imports/PIC inspection,
+and construction/first draw at two emulated load addresses with strict alignment.
+The matching Helper branch passed all 3924 tests and analysis without issues.
+
+
+### Control correction: use buttons, preserve the encoders
+
+The owner found that claiming the right encoder prevented normal native parameter
+editing. This supersedes the encoder proposal and its pending acceptance above.
+Only `kNT_button1 | kNT_button4` are now claimed: button 1 scrolls up and button 4
+scrolls down on press edges. Held buttons do not repeat, and simultaneous presses
+cancel. Both encoders remain entirely firmware-owned. Native tests cover button
+edges, held/other buttons, encoder input being ignored, bounds and map/revision
+preservation. Physical button operation remains an owner acceptance check.
+
+The corrected object has SHA-256 `100ccd085f866e0a5c5a6066bb85f2d56b38550b7c11163708a18e11c40d6f92`. Upload used a fresh verified backup
+`/presets/PH 0928 112251.json`; SD object readback and preset restoration succeeded.
+Native sanitizer, static analysis, ARM inspection and two-address strict-alignment
+startup checks passed again.
+
+
+## Explicit custom controls (2026-09-28)
+
+The owner replaced the partial override design with explicit channel/field/value
+controls. Pot 1 and encoder 1 select a socket, pot 2 selects colour/tag, and pot 3
+or encoder 2 changes its value. Pressing and turning encoder 1 scrolls the filtered
+list without editing. This supersedes the button 1/4 mapping above.
+
+The pinned C++ API can retain the firmware row through `draw() == false`, but
+exposes no native focus setter. A temporary `ThRd` hardware diagnostic called
+`NT_setParameterFromUi()` to change Tag to 7 while Cable colour was focused.
+Parameter readback contained Tag 7, but the screen still showed Cable colour.
+The production custom view therefore renders its own matching control strip
+and returns true; the regular four-field parameter pages remain unchanged.
+The diagnostic preset was temporary and the working preset was restored.
+
+UI edits use `NT_setParameterFromUi()` with `NT_parameterOffset()`; the normal
+parameter callback updates persistent map records and revisions. Selecting and
+scrolling remain local view state. Pot 3 has pickup after selection or remote/
+encoder edits. Non-finite pot positions are ignored; values and channel bounds
+are clamped. Native tests cover these cases, all three pots, both encoders,
+legacy high-bank writes, modifier isolation and setupUi targets.
+
+Native ASan/UBSan tests, cppcheck, ARM import/PIC inspection and strict-alignment
+startup at two load addresses passed. The uploaded object was read back exactly:
+SHA-256 `a6dfa137f5fb1912848e5d0360ea719a52cfaa98ce8e1a895f1125c1ad54902e`.
+A fresh backup `/presets/PH 0928 113117.json` was restored as Patch Pages Test.
+The hardware screen below verifies layout and successful loading, not physical
+control feel; that remains owner acceptance.
+
+![Custom controls above connected sockets](evidence/native-custom-controls.png)
+
+
+## Five-column selection-following list (2026-09-28)
+
+The owner accepted the custom control scheme and requested system-style header
+cells, automatic selection visibility, access to filtered unused sockets, and
+all table columns on one line. This supersedes the press-and-turn scroll gesture.
+The header now uses cell bounds 0–51, 60–128 and 138–255, background shades 1/1/2,
+and normal text at baseline 8, matching the observed system parameter row.
+
+The four list rows retain baselines 21, 34, 47 and 60. Columns are socket,
+destination (27-character preview), colour, tag, and group (15-character preview).
+Overflow ends in three ASCII dots; the persistent strings and full native text
+properties remain unchanged. The selected row has a full-width highlight.
+Connected selections scroll into view automatically. Unused selected sockets
+occupy the bottom row with up to three connected rows above; their colour/tag
+remain editable. An empty map still shows its selected unused socket. The left
+encoder press is no longer claimed.
+
+Native tests cover forward/backward selection, gaps, unused editing, empty maps,
+inventory shrink, all five fields, ellipses, and unchanged map/revision during
+navigation. Existing controls and pickup tests also pass, along with cppcheck,
+ARM object inspection and strict-alignment startup at two addresses.
+
+The uploaded object was read back exactly: SHA-256
+`654d0218f3af5d425267b319bd1a769c1ad097fe98c3c72d7734d2fb0a6093f5`.
+The working preset was backed up as `/presets/PH 0928 114135.json`, then restored.
+The live screen shows selected unused Output 3 in the bottom row and connected
+inputs above it, with all five columns visible. Broader physical control feel
+remains owner acceptance. Helper required no change or restart.
+
+![System-style header and five-column socket rows](evidence/native-five-column-list.png)
+
+Impeccable's existing product context contains older text-editing and bank-limit
+claims. This scoped polish followed the live V1 spec and implementation instead;
+the unrelated product-context drift was not rewritten as part of this change.
+
+
+### Selection brightness correction (2026-09-28)
+
+Removed the filled selection rectangle because native text rendering cut into
+its background. Only the selected channel label is brighter (15 versus 8);
+the five-column layout, automatic visibility and unused-row editing are retained.
+Native sanitizer tests, ARM inspection and strict-alignment startup passed.
+The corrected object was uploaded and verified by exact SD readback (SHA-256
+`e1e0f71a4e89e8df1b4683e2a5dbc070aca80fd5b7c2abc9ee15046550ced424`).
+The fresh `/presets/PH 0928 114531.json` backup was restored. The live capture
+confirms black row backgrounds and label-only selection emphasis.
+
+![Selected channel label without a background bar](evidence/native-label-selection.png)

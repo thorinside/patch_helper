@@ -20,10 +20,12 @@ inline void writeInteger(uint8_t* data, uint32_t value) {
     for (int i = 0; i < 4; ++i) { data[i] = value & 127; value >>= 7; }
 }
 inline bool isRequest(const uint8_t* data, std::size_t size) {
-    if (size < kHeaderBytes || size > 120 ||
-        std::memcmp(data, kPrefix, sizeof(kPrefix)) != 0) return false;
+    if (size < kHeaderBytes || size > 120) return false;
+    // The NT loader does not export memcmp. Compare the short wire prefix here.
+    for (std::size_t i = 0; i < sizeof(kPrefix); ++i)
+        if (data[i] != kPrefix[i]) return false;
     for (std::size_t i = 0; i < size; ++i) if (data[i] > 127) return false;
-    return data[6] >= 1 && data[6] <= 8;
+    return data[6] >= 1 && data[6] <= 9;
 }
 template <std::size_t N>
 bool readText(const uint8_t*& data, const uint8_t* end, char (&text)[N]) {
@@ -46,7 +48,7 @@ inline void writeText(uint8_t*& data, const char* text) {
 // Caller validates/addresses the frame. Reply fits in 121 bytes and excludes F0/F7.
 inline std::size_t respond(PatchMap& map, Session& session,
                           const uint8_t* request, std::size_t size,
-                          uint8_t (&reply)[128]) {
+                          uint8_t (&reply)[128], int firstSocket = 0) {
     std::memcpy(reply, request, kHeaderBytes);
     reply[6] |= 0x40;
     auto status = Status::ok;
@@ -69,6 +71,16 @@ inline std::size_t respond(PatchMap& map, Session& session,
             }
         }
     } else if (lease == 0 || lease != session.lease) status = Status::expired;
+    else if (command == 9) {
+        if (data != end || firstSocket < 0 || firstSocket >= map.socketCount()) status = Status::invalid;
+        else {
+            writeText(output, map.title);
+            *output++ = static_cast<uint8_t>(map.expanderCount);
+            *output++ = static_cast<uint8_t>(firstSocket + 1);
+            *output++ = static_cast<uint8_t>(map.connections[firstSocket].colour);
+            *output++ = static_cast<uint8_t>(map.connections[firstSocket].tag);
+        }
+    }
     else if (revision != session.revision) status = Status::conflict;
     else if (command == 2) {
         if (end - data != 1 || *data >= map.socketCount()) status = Status::invalid;
@@ -92,7 +104,21 @@ inline std::size_t respond(PatchMap& map, Session& session,
             candidate.colour = *data++; candidate.tag = *data++;
             if (!readText(data, end, candidate.destination) ||
                 !readText(data, end, candidate.group) || data != end) status = Status::invalid;
-            else { map.connections[socket] = candidate; ++session.revision; }
+            else {
+                // Old presets may contain longer destinations. Preserve those
+                // unchanged during unrelated edits, but never create new ones.
+                bool unchanged = true;
+                for (std::size_t i = 0; i < sizeof(candidate.destination); ++i) {
+                    if (candidate.destination[i] != map.connections[socket].destination[i]) {
+                        unchanged = false;
+                        break;
+                    }
+                    if (!candidate.destination[i]) break;
+                }
+                if (std::strlen(candidate.destination) > kEditableTextLength && !unchanged)
+                    status = Status::invalid;
+                else { map.connections[socket] = candidate; ++session.revision; }
+            }
         }
     } else if (command == 4) {
         char title[kTextBytes]{};
@@ -100,7 +126,7 @@ inline std::size_t respond(PatchMap& map, Session& session,
         else { std::memcpy(map.title, title, sizeof(title)); ++session.revision; }
     }
     if (status == Status::ok && command == 5) {
-        if (end - data < 2 || *data > 3 || map.expanderCount == kMaxExpanders) status = Status::invalid;
+        if (end - data < 2 || *data > 3 || map.expanderCount >= kNativeExpanders) status = Status::invalid;
         else {
             Expander candidate;
             candidate.type = *data++;

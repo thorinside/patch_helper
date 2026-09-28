@@ -12,7 +12,10 @@ Use a direct USB connection to one NT. The experimental/non-commercial MIDI
 manufacturer ID `7D` is deliberately separate from Expert Sleepers' commands.
 Do not route this protocol to multiple NTs on the same MIDI endpoint: the public
 plug-in API does not expose the configured device SysEx ID or incoming port.
-Replies go to USB only. Hardware callback dispatch must still be verified.
+Replies go to USB only. `NT_sendMidiSysEx` receives the opening `F0` from
+the plug-in and appends `F7` when `end=true`. Incoming callback data tolerates
+either delimiter being retained or omitted. Native tests compare complete
+wire replies, including both delimiters.
 
 Every request is `F0 <header> <payload> F7`. The 20-byte header is:
 
@@ -29,13 +32,16 @@ Integers use four little-endian base-128 bytes (28 bits). All bytes inside the
 MIDI delimiters are 7-bit. The response echoes the header with command OR `40`,
 replaces revision with the current revision, then adds one status byte and data.
 Status is 0 success, 1 invalid request, 2 expired session, 3 revision conflict.
-The largest valid frame is 122 bytes, comfortably below Helper's 1024-byte limit.
+The largest valid frame is 123 bytes, comfortably below Helper's 1024-byte limit.
 Wrong prefixes, unsupported commands, invalid frames, and nonmatching slots are
 ignored. Valid requests with invalid payloads return status 1 without mutation.
 
 Text is a one-byte length followed by printable ASCII bytes (no terminator).
-Limits remain 63 characters for title/destination and 31 for group; these are
-explicit development format choices. Reject invalid text rather than truncate.
+New destinations, groups and expander names accept at most 32 characters.
+The hidden legacy title still accepts 63. Presets and reads preserve older
+63-character destinations; a connection write may retain that exact destination
+while changing other fields, but any replacement must fit 32 characters.
+Reject invalid text rather than truncate.
 
 | Command | Request payload | Successful response data |
 |---|---|---|
@@ -103,12 +109,13 @@ Additional commands:
 | 7 Rename expander | index, name text | empty |
 | 8 Move expander | from index, to index | empty |
 
-Types 0–3 are NTX-8CV, ES-5, ESX-8GT, ESX-8CV. Names are at most 31 printable
+Types 0–3 are NTX-8CV, ES-5, ESX-8GT, ESX-8CV. Names are at most 32 printable
 ASCII characters. Command 6 is a read; 5/7/8 increment revision once on success.
 A move shifts complete eight-socket banks and their metadata atomically. Native
-IDs stay 0–19; expander IDs follow in physical list order. Capacity is thirteen
-banks, derived from the 7-bit socket ID. Invalid payloads and overflow fail
-without mutation. Maximum frame size stays 122 bytes.
+IDs stay 0–19; expander IDs follow in physical list order. Wire/preset capacity
+is thirteen banks, derived from the 7-bit socket ID. New additions stop at eight
+banks; older larger maps remain readable and editable. Invalid payloads and overflow fail
+without mutation. Maximum frame size stays 123 bytes.
 
 Helper reads title/count, every expander, and every configured socket under one
 lease/revision before exposing a map. Preset version 2 requires an `expanders`
@@ -116,3 +123,18 @@ array of `{type, name}` objects and exactly 20 + 8×count connection records.
 Version 1 remains readable and is still written for maps without expanders.
 The shared expanded-session fixture exercises Lua-dispatched edits against both
 Dart and the actual C++ factory, including rename, move and reload.
+
+## Revision 4 watch request
+
+Command `09`, empty payload, checks the lease but deliberately accepts an older
+revision. Reply header carries current map revision; payload is title text,
+expander count, one-based First socket, cable colour index, tag. All four numeric
+fields occupy one MIDI data byte each. It is read-only, does not advance revision,
+and never opens a lease. Trailing request bytes are invalid. A changed revision
+requires rereading banks/connections at that revision; conflict fails closed.
+
+Native colour/tag edits advance the same map revision as Helper writes. At
+revision exhaustion they invalidate the lease before resetting the revision.
+Selection-only changes do not mutate the map revision. `live-session.json`
+contains read frames interleaved with native parameter callbacks and is exercised
+by the actual C++ factory and the Dart client/Lua companion tests.
