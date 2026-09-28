@@ -84,7 +84,9 @@ Deserialization uses the instance-owned scratch map, not a whole map on stack.
 
 `make arm-smoke` runs the built ARM object under Unicorn with strict data
 alignment checks, explicit host-function stubs, halfword-aligned parameter
-storage, and both zeroed and poisoned instance memory. It exercises construction,
+storage, and both zeroed and poisoned instance memory. It runs at two code/data
+address layouts and rejects instance reads/writes beyond the declared SRAM size,
+including accesses performed by stubbed `memcpy` and `memset`. It exercises construction,
 initial parameter callbacks, the first `step`, and `draw`. This is not an NT
 firmware/ELF-loader emulator and does not replace hardware acceptance.
 
@@ -98,6 +100,18 @@ failed the ARM startup test while reading its default title with an unaligned
 word load. Makefile changes invalidate the hardware object to prevent stale
 flags. The import allowlist is observed compatibility, not a complete firmware
 export catalogue; the device reported `memcmp` as unavailable.
+
+The follow-up allocation/PIC audit found no heap allocation in the ARM object.
+`requirements()` declares the entire instance, including both maps and mutable
+parameter definitions. Placement `new` initializes that host-supplied block;
+it does not allocate from a heap. The hardware translation unit rejects builds
+without `-fPIC`. A colour table previously had external inline linkage, producing
+GOT relocations that the GNU linker in the smoke test resolved automatically.
+The table now has internal linkage, retaining PIC while eliminating the GOT.
+Object inspection rejects GOT dependencies and unexpected imports (including
+heap allocators). The previous alignment build still crashed on the physical NT;
+GOT elimination is a loader-compatibility hypothesis, not confirmed causation.
+
 `make static-check` runs cppcheck. It suppresses only two warning categories
 in the unmodified upstream headers: host-owned aggregate members without a
 constructor, and the upstream private non-explicit JSON-stream constructor.

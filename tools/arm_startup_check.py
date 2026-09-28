@@ -26,11 +26,26 @@ def run(elf_path, imports, fill):
         symbols = {s.name: s['st_value'] for s in elf.get_section_by_name('.symtab').iter_symbols()}
     stubs = {symbols[name] & ~1: name for name in imports}
     drawn = []
+    sram_size = None
+    arena = 0x20020000
+
+    def check_instance_access(address, size):
+        if sram_size is not None and address < arena + 65536 and address + size > arena:
+            assert arena <= address and address + size <= arena + sram_size, 'Access beyond requested SRAM'
+
+    def read(address, size):
+        check_instance_access(address, size)
+        return bytes(cpu.mem_read(address, size))
+
+    def write(address, data):
+        check_instance_access(address, len(data))
+        cpu.mem_write(address, data)
+
 
     def string(address):
         result = bytearray()
         for i in range(1024):
-            byte = cpu.mem_read(address + i, 1)[0]
+            byte = read(address + i, 1)[0]
             if byte == 0:
                 return bytes(result)
             result.append(byte)
@@ -42,20 +57,20 @@ def run(elf_path, imports, fill):
         name = stubs[address]
         r0, r1, r2 = [cpu.reg_read(r) for r in (UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2)]
         if name == 'memset':
-            cpu.mem_write(r0, bytes([r1 & 255]) * r2)
+            write(r0, bytes([r1 & 255]) * r2)
         elif name == 'memcpy':
-            cpu.mem_write(r0, bytes(cpu.mem_read(r1, r2)))
+            write(r0, read(r1, r2))
         elif name == 'strlen':
             cpu.reg_write(UC_ARM_REG_R0, len(string(r0)))
         elif name == 'strcpy':
-            cpu.mem_write(r0, string(r1) + b'\0')
+            write(r0, string(r1) + b'\0')
         elif name == 'strcat':
-            cpu.mem_write(r0 + len(string(r0)), string(r1) + b'\0')
+            write(r0 + len(string(r0)), string(r1) + b'\0')
         elif name == 'strncpy':
-            cpu.mem_write(r0, string(r1)[:r2].ljust(r2, b'\0'))
+            write(r0, string(r1)[:r2].ljust(r2, b'\0'))
         elif name == 'NT_intToString':
             text = str(r1).encode()
-            cpu.mem_write(r0, text + b'\0')
+            write(r0, text + b'\0')
             cpu.reg_write(UC_ARM_REG_R0, len(text))
         elif name == 'NT_drawText':
             drawn.append(string(r2).decode())
@@ -65,6 +80,7 @@ def run(elf_path, imports, fill):
             raise AssertionError('Unexpected startup host call: ' + name)
 
     def memory_access(cpu, _kind, address, size, _value, _user):
+        check_instance_access(address, size)
         # Enforce natural alignment even when the emulator would permit it.
         if size > 1 and address % size:
             pc = cpu.reg_read(UC_ARM_REG_PC)
@@ -72,15 +88,21 @@ def run(elf_path, imports, fill):
 
     cpu.hook_add(UC_HOOK_CODE, host_call)
     cpu.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, memory_access)
-    cpu.mem_write(0x20020000, bytes([fill]) * 65536)
+    def call(name):
+        cpu.reg_write(UC_ARM_REG_SP, 0x200f0000)
+        cpu.reg_write(UC_ARM_REG_LR, 0xf0001)
+        cpu.emu_start(symbols[name] | 1, 0xf0000, count=1000000)
+        assert cpu.reg_read(UC_ARM_REG_PC) == 0xf0000, 'Callback did not return'
+
+    call('probeSram')
+    sram_size = cpu.reg_read(UC_ARM_REG_R0)
+    assert 0 < sram_size < 65536
+    cpu.mem_write(arena, bytes([fill]) * sram_size)
     # Parameters require halfword alignment, not word alignment.
     cpu.mem_write(0x20010002, struct.pack('<hhh', 1, 0, 0))
     cpu.reg_write(UC_ARM_REG_R0, 0x20020000)
     cpu.reg_write(UC_ARM_REG_R1, 0x20010002)
-    cpu.reg_write(UC_ARM_REG_SP, 0x200f0000)
-    cpu.reg_write(UC_ARM_REG_LR, 0x80001)
-    cpu.emu_start(symbols['probe'] | 1, 0x80000, count=1000000)
-    assert cpu.reg_read(UC_ARM_REG_PC) == 0x80000, 'Startup did not return'
+    call('probe')
     assert drawn == ['Patch Helper'] + [v for i in range(1, 5) for v in (f'In {i}', 'None', '(unused)')], drawn
 
 
@@ -94,7 +116,8 @@ with tempfile.TemporaryDirectory(prefix='patch-helper-arm-') as folder:
         f'.global {name}\n.thumb_func\n{name}:\n bx lr\n' for name in imports))
     stubs, elf = folder / 'stubs.o', folder / 'startup.elf'
     subprocess.run(['arm-none-eabi-as', '-mcpu=cortex-m7', '-mthumb', str(assembly), '-o', str(stubs)], check=True)
-    subprocess.run(['arm-none-eabi-ld', '-Ttext=0x10000', '-Tdata=0x20000000', '-e', 'probe', str(probe), str(plugin), str(stubs), '-o', str(elf)], check=True)
-    for fill in (0, 0xa5):
-        run(elf, imports, fill)
-print('PASS: ARM construction, initial parameters, first step and draw with strict alignment and poisoned SRAM')
+    for text_base, data_base in ((0x10000, 0x20000000), (0x50000, 0x20001000)):
+        subprocess.run(['arm-none-eabi-ld', f'-Ttext={text_base:#x}', f'-Tdata={data_base:#x}', '-e', 'probe', str(probe), str(plugin), str(stubs), '-o', str(elf)], check=True)
+        for fill in (0, 0xa5):
+            run(elf, imports, fill)
+print('PASS: ARM construction, initial parameters, first step and draw at two load addresses, within requested SRAM, with strict alignment and poisoned memory')

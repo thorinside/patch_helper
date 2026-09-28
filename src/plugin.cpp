@@ -1,3 +1,6 @@
+#if defined(__arm__) && (!defined(__PIC__) || __PIC__ != 2)
+#error "The NT hardware build requires -fPIC"
+#endif
 #include <cstddef>
 #include <distingnt/api.h>
 #include <distingnt/serialisation.h>
@@ -31,6 +34,8 @@ void requirements(_NT_algorithmRequirements& req, const int32_t*) {
 }
 _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
                          const _NT_algorithmRequirements&, const int32_t*) {
+    // Placement construction uses only the block declared in requirements().
+    // This does not invoke heap allocation.
     auto* algorithm = new (ptrs.sram) Algorithm();
     std::copy(std::begin(parameters), std::end(parameters), algorithm->definitions.begin());
     algorithm->parameters = algorithm->definitions.data();
