@@ -64,6 +64,7 @@ equivalent). No JSON library is linked into the ARM object.
 
 ```sh
 git submodule update --init
+python3 -m pip install -r tools/requirements-arm-smoke.txt
 make verify
 # Override only when headers are outside the compiler's normal search path:
 make test JSON_INCLUDE=/custom/include
@@ -77,8 +78,26 @@ does not prove firmware parser or physical preset lifecycle behavior.
 
 `make inspect` verifies ELF32 little-endian ARM relocatable output, exported
 `pluginEntry`, and an allowlist of runtime and pinned API imports. Section
-sizes and demangled imports are printed for review. `step` does no work;
-deserialization uses a temporary map on the control-side stack (about 2 KiB).
+sizes and demangled imports are printed for review. `step` projects native
+controls when needed and never reads or writes the audio/CV buffer.
+Deserialization uses the instance-owned scratch map, not a whole map on stack.
+
+`make arm-smoke` runs the built ARM object under Unicorn with strict data
+alignment checks, explicit host-function stubs, halfword-aligned parameter
+storage, and both zeroed and poisoned instance memory. It exercises construction,
+initial parameter callbacks, the first `step`, and `draw`. This is not an NT
+firmware/ELF-loader emulator and does not replace hardware acceptance.
+
+The 2026-09-27 build-flags audit compared the skill's `templates/Makefile` and
+pinned API `examples/Makefile`: Cortex-M7, FPv5-D16 hard float, Thumb, `-Os`,
+`-fPIC`, no RTTI/exceptions, function/data sections, and no unwind tables.
+C++17 is required by our source; a single compilation unit produces the
+relocatable object directly with `-c`, matching the upstream example approach.
+`-mno-unaligned-access` is an additional hardware safeguard: the earlier object
+failed the ARM startup test while reading its default title with an unaligned
+word load. Makefile changes invalidate the hardware object to prevent stale
+flags. The import allowlist is observed compatibility, not a complete firmware
+export catalogue; the device reported `memcmp` as unavailable.
 `make static-check` runs cppcheck. It suppresses only two warning categories
 in the unmodified upstream headers: host-owned aggregate members without a
 constructor, and the upstream private non-explicit JSON-stream constructor.

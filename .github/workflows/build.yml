@@ -13,6 +13,11 @@ jobs:
           submodules: recursive
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi libstdc++-arm-none-eabi-dev nlohmann-json3-dev cppcheck
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ARM startup test dependencies
+        run: python3 -m pip install -r tools/requirements-arm-smoke.txt
       - name: Native tests and ARM inspection
         run: make verify
       - name: Static analysis
