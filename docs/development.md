@@ -1,5 +1,9 @@
 # Development contract
 
+For installation and current controls, see the [user guide](../README.md).
+This document includes dated investigation notes and superseded UI experiments;
+the [V1 spec](v1-spec.md) records the current baseline.
+
 ## Source and scope
 
 Started from Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`,
@@ -12,6 +16,26 @@ brainstorming capture remains in source-spec.md. V1 is not a production tag.
 The live workflow now includes preset serialization, SD companion loading/cache,
 automatic field reconciliation, the table/minimap, native colour/tag pages,
 and dynamic page updates. See the V1 spec for measured hardware evidence.
+
+## Packaging
+
+`make package` builds and inspects the ARM object, then creates
+`build/patch_helper-preview.zip` with exactly these files:
+
+```text
+programs/plug-ins/patch_helper.o
+programs/helper/ThPh.lua
+README.md
+```
+
+CI uses the same command. Tags matching `v*-preview.*` publish a GitHub
+prerelease only after verification succeeds, using that run's ZIP artifact.
+Production tags are not published by this workflow.
+Release ZIPs must retain both SD-relative paths;
+`programs/helper/ThPh.lua` is a companion dependency, not a Lua algorithm.
+The Helper installer support is in
+[PR #152](https://github.com/No-Such-Device/nt_helper/pull/152), based on its
+companion development branch. No released Helper version is claimed here.
 
 ## Verified API findings
 
@@ -124,7 +148,8 @@ GOT elimination is a loader-compatibility hypothesis, not confirmed causation.
 `make static-check` runs cppcheck. It suppresses only two warning categories
 in the unmodified upstream headers: host-owned aggregate members without a
 constructor, and the upstream private non-explicit JSON-stream constructor.
-Plugin warnings remain errors. No production release is created by CI.
+Plugin warnings remain errors. CI publishes only explicitly tagged development
+prereleases, never a production release.
 
 The fixture is also stored in nt_helper at
 `test/fixtures/patch_map/native-map.json`. Keep both copies identical when the

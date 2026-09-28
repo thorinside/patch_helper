@@ -33,9 +33,10 @@ on 2026-09-27, after approving the merge of revision 2.
 The [V1 spec](docs/v1-spec.md) records the current baseline and open acceptance
 items. The editor shows 12 inputs, 8 outputs and eight outputs per expander,
 with destination, cable colour, optional numeric Tag (1–12), and group.
-Destination supports 63 printable ASCII characters; group and expander names
-support 31. Blank destination means unused and preserves other metadata.
-New maps support 12 banks; legacy 13-bank maps retain their records.
+New destination, group and expander-name edits support 32 printable ASCII
+characters. Longer destinations from older previews remain intact until replaced.
+Blank destination means unused and preserves other metadata.
+New maps support eight banks; legacy 13-bank maps retain their records.
 
 The host executes `/programs/helper/ThPh.lua` from the NT SD card. Loading,
 scratch caching, background source refresh and field synchronization are
@@ -43,10 +44,11 @@ automatic. Valid edits appear immediately and reconcile until acknowledged
 while the editor session remains open; there is no durable offline outbox yet.
 There are no patch-title, Load, Reload, Apply/Discard, or narrative help controls.
 
-The NT currently has a colour/tag parameter page per socket, with dynamic page
-updates. Full native field parity is required: destination, group and expander
-name must use the NT's existing text-property editor, not a custom keyboard.
-The C++ string/property-change bridge is still under investigation.
+The NT has separate destination, colour, tag and group properties per socket.
+Text is greyed out and read-only; the owner accepts this pending C++ SDK support
+for native text editing. An Expander bank page selects which bank's eight socket
+pages are visible. The custom view offers socket/colour/tag controls and a
+selection-following list with all five table columns.
 
 A one-second active watch supplies Lua `on_change` with authoritative map and
 property changes. Local fields merge with unrelated native edits. Socket focus
@@ -75,8 +77,8 @@ The user selected a straight table with a coloured clickable socket minimap.
 Inputs are 3 rows × 4 columns; outputs 4 rows × 2 columns; each expander
 8 rows × 1 column. Groups appear left to right in that order. The editor
 offers NTX-8CV, ES-5, ESX-8GT and ESX-8CV. Selecting a coloured minimap dot
-scrolls to and highlights its table row. Native text-property editing remains required for V1 parity. End-of-chain
-preset merging remains unverified. Gear-sorted presentation and adapters for
+scrolls to and highlights its table row. Native text editing is deferred pending
+SDK support. End-of-chain preset merging remains unverified. Gear-sorted presentation and adapters for
 additional algorithms are deferred.
 
 The user explicitly requires Flutter visual quality to remain as polished as

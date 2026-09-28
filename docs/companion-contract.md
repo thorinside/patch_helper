@@ -74,7 +74,8 @@ The one-byte wire address preserves storage for 13 eight-output expanders (124 t
 sockets); this is a protocol capacity, not a hardware topology claim. Expanders
 are manually recorded, never auto-detected or configured for signal routing.
 
-Native text-property editing is required for V1 field parity and is still pending.
+Native text is displayed in separate read-only properties. The owner accepts
+editing it in Helper pending native text-editing support in the C++ SDK.
 Gear-sorted presentation and arbitrary companion adapters are deferred. Regular
 preset recall has hardware evidence; end-of-chain merging remains unverified. No physical-device acceptance is implied by tests.
 
