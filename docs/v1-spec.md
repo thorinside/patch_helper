@@ -76,7 +76,12 @@ Selecting a dot scrolls its table row into view and highlights it. Empty,
 uncoloured sockets are hollow. Dots and rows update together after local or
 NT changes. On narrower windows the minimap is collapsible.
 
-The sync indicator stays at the top left in a fixed-size slot. A compact action
+The sync indicator stays at the top left in a fixed-size slot. Beside it, show
+the current NT slot name (its existing 32-character limit), falling back to
+Patch Helper. This read-only Flutter header label follows slot renames without
+reloading the Lua editor. Keep it on one line in the existing fixed-height bar,
+using an ellipsis when space is narrow. It is not a separate patch-title field.
+A compact action
 bar sits at the top right. Its Add expander action opens a Lua-defined choice
 dialog rendered by Flutter, containing NTX-8CV, ES-5, ESX-8GT and ESX-8CV. Choosing
 one adds it; Escape, Cancel, or dismissing the dialog makes no change. The model
