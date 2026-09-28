@@ -140,3 +140,27 @@ as a current acceptance gate. New destination, group and expander-name edits
 are limited to 32 characters; legacy longer destinations remain intact.
 The existing socket pages must remain. A full value is returned through
 `parameterString()` into the SDK's minimum 64-byte buffer.
+
+## Greyed-out read-only property proof (2026-09-28)
+
+The owner proposed separate dummy string properties, greyed out until native
+text editing exists in the SDK. The official `examples/gainCustomUI.cpp` uses
+`NT_setParameterGrayedOut(NT_algorithmIndex(self), p + NT_parameterOffset(), true)`.
+
+`make read-only-text-probe` builds the isolated `ThRd` diagnostic. It allocates
+four properties: Destination (fixed zero, has strings), Cable colour, Tag, and
+Group (fixed zero, has strings). On its first enabled audio step it marks only
+the two string properties grey. The firmware loaded this object successfully;
+`0x50` returned `From Beads L` and `FX`, and the NT screen retained both text rows
+around the editable controls. Physical encoder skip behavior was not separately
+exercised. The diagnostic was tested in a temporary preset; the user's saved
+four-slot Patch Pages Test map was restored afterward.
+
+![Separate read-only NT text properties](evidence/read-only-socket-text.png)
+
+This proves the display mechanism without changing Patch Helper's parameter
+layout or expander limit. Production adoption awaits the capacity decision:
+two distinct string properties per socket require reallocating the current
+235-parameter layout. Four banks fit four fields per socket plus the legacy
+controls; five banks exceed the measured 240-parameter ceiling. Existing larger
+maps and parameter mappings need explicit compatibility handling.

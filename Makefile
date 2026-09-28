@@ -11,6 +11,13 @@ build/native_text_probe.o: tools/native_text_probe.cpp distingNT_API/include/dis
 	mkdir -p build
 	$(ARM_CXX) $(COMMON) $(ARM_FLAGS) -c $< -o $@
 
+build/read_only_text_probe.o: tools/read_only_text_probe.cpp distingNT_API/include/distingnt/api.h Makefile
+	mkdir -p build
+	$(ARM_CXX) $(COMMON) $(ARM_FLAGS) -c $< -o $@
+
+read-only-text-probe: build/read_only_text_probe.o
+	python3 tools/inspect_object.py $<
+
 native-text-probe: build/native_text_probe.o
 plugins/patch_helper.o: src/plugin.cpp src/patch_map.h src/patch_protocol.h distingNT_API/include/distingnt/api.h Makefile
 	mkdir -p plugins
@@ -34,4 +41,4 @@ arm-smoke: hardware build/arm_startup.o
 verify: test inspect arm-smoke
 static-check:
 	cppcheck --enable=warning,style,performance,portability --std=c++17 --suppress=missingIncludeSystem --suppress='uninitMemberVarNoCtor:distingNT_API/include/distingnt/api.h' --suppress='noExplicitConstructor:distingNT_API/include/distingnt/serialisation.h' --error-exitcode=1 -I src -I distingNT_API/include src
-.PHONY: all hardware test inspect arm-smoke verify static-check native-text-probe
+.PHONY: all hardware test inspect arm-smoke verify static-check native-text-probe read-only-text-probe

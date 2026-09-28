@@ -128,9 +128,13 @@ limited to 32 characters for new edits in preparation for that API.
 The SDK's `parameterString(self, p, v, buffer)` callback returns an entire
 NULL-terminated value, not a single character; its buffer is at least 64 bytes.
 Use `kNT_unitHasStrings` for native formatted values until editable strings are
-supported. Preserve the existing independent socket pages and their two numeric
-controls, with destination/group displayed alongside those controls. This does
-not introduce extra selector pages or remove expander capacity.
+supported. The current combined strings are an interim implementation. The owner
+requests separate fixed-value `kNT_unitHasStrings` properties for Destination
+and Group, greyed out with `NT_setParameterGrayedOut()` until native editing is
+available. An isolated device test confirms that these text rows remain visible
+when greyed out. Keep colour/tag editable and retain independent socket pages.
+Production adoption awaits the expander-capacity and mapping-compatibility
+decision; the existing combined display and bank limit remain unchanged for now.
 
 Investigation on 2026-09-28 verified the diagnostic SysEx `0x53` receive path
 and `parameterString` / `0x50` readback, but that does not expose a native text
