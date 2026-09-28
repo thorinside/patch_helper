@@ -33,9 +33,10 @@ prerelease only after verification succeeds, using that run's ZIP artifact.
 Production tags are not published by this workflow.
 Release ZIPs must retain both SD-relative paths;
 `programs/helper/ThPh.lua` is a companion dependency, not a Lua algorithm.
-The Helper installer support is in
-[PR #152](https://github.com/No-Such-Device/nt_helper/pull/152), based on its
-companion development branch. No released Helper version is claimed here.
+The companion editor and Gallery installer support ship in
+[NT Helper 2.56.0](https://github.com/No-Such-Device/nt_helper/releases/tag/v2.56.0).
+The owner confirmed Gallery submission, download, installation of both files,
+and successful use of the companion on 2026-09-28.
 
 ## Verified API findings
 

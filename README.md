@@ -6,9 +6,9 @@ Connections are entered manually; Patch Helper does not detect cables or change
 audio, CV, or routing.
 
 **Development preview.** Tested on disting NT firmware **1.19.0beta**. Other
-firmware versions have not been verified. The companion editor requires the
-[NT Helper development work in PR #152](https://github.com/No-Such-Device/nt_helper/pull/152),
-including its dependent companion changes; it is not yet in a released Helper build.
+firmware versions have not been verified. The companion editor requires
+[NT Helper 2.56.0](https://github.com/No-Such-Device/nt_helper/releases/tag/v2.56.0)
+or newer.
 
 ## Install
 
@@ -21,7 +21,7 @@ programs/helper/ThPh.lua
 ```
 
 Restart the NT after copying, then add **Patch Helper** to your preset and turn
-Bypass off. The matching Helper development build can also install this ZIP
+Bypass off. NT Helper 2.56.0 or newer can also install this ZIP
 through its Gallery installer, placing both files in their respective folders.
 
 The Lua file stays on the SD card. Helper downloads, caches, and runs it on the

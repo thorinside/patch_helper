@@ -12,10 +12,9 @@ programs/plug-ins/patch_helper.o
 programs/helper/ThPh.lua
 ```
 
-The companion requires the development changes in
-[NT Helper #152](https://github.com/No-Such-Device/nt_helper/pull/152), including
-its dependent companion work. This support is not yet in a released Helper
-build. That development build can also install the ZIP through its Gallery.
+The companion requires
+[NT Helper 2.56.0](https://github.com/No-Such-Device/nt_helper/releases/tag/v2.56.0)
+or newer. Helper can install both files from this ZIP through its Gallery.
 
 Hardware testing during development used firmware **1.19.0beta** and covered
 loading, native display, two-way edits, dynamic pages, and regular preset recall.
