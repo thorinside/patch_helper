@@ -61,6 +61,19 @@ a dot scrolls to and highlights its table row; reduced-motion settings disable
 the scroll animation. Empty destinations show as unused. Tag is a plain
 integer field, 1–12 or blank, with validation beside the affected row.
 
+Live NT socket selection uses that same highlight and scroll behavior without
+moving keyboard focus. Unsent row, title, or expander-name edits suspend live
+navigation. This is a behavior extension of the incumbent table/minimap, with
+no new visual tokens or navigation surface.
+
+When a native map change conflicts with an unsent draft, retain the displayed
+table and draft text and disable editing until reload. Keep the error visible
+in the existing Material feedback language. The expander-name dialog stays
+open after a synchronization error, retains the entered name, disables Apply,
+and explains how to copy the name before closing and reloading. A successful
+Apply closes the dialog only after acknowledgement; Cancel remains available
+when no operation is in progress.
+
 ## Do's and Don'ts
 
 Evidence: committed Helper screenshots under
@@ -70,6 +83,8 @@ character. Their chosen seed and old algorithm content are not new requirements.
 Discard the black capture margins outside the app when composing prototypes.
 
 Current native editor captures are in Helper's
-`docs/evidence/patch-helper/editor-desktop.png` and `editor-compact.png`.
-Their cable names are sample data; the captures demonstrate the Helper layout,
-not physical-device acceptance.
+`docs/evidence/patch-helper/editor-desktop.png`, `editor-compact.png`, and
+`editor-name-conflict.png`. Their cable names are sample data; the captures
+demonstrate the Helper layout and recovery state, not physical-device
+acceptance. Revision 4 finish review cleared the draft recovery fix using all
+three validated captures.

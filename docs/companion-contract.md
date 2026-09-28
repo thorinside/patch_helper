@@ -75,3 +75,46 @@ are manually recorded, never auto-detected or configured for signal routing.
 NT-side text entry, a gear-sorted alternative, arbitrary companion discovery,
 and regular/end-of-chain preset lifecycle acceptance remain separate work from
 the approved Helper table. No physical-device acceptance is implied by tests.
+
+## Live NT properties (revision 4)
+
+An optional `on_change(state, change)` callback returns the same validated table
+document as `render`. Without it, the host falls back to `render`. This extends
+API 1 without breaking older companions. Every call uses a fresh Lua runtime;
+this is a declarative callback, not a persistent Lua closure or event loop.
+
+The `ThPh` adapter supplies `state.properties = {first_socket, colour, tag}` and
+`state.revision`. First socket is one-based; colour is the existing palette index;
+tag is 0 for none or 1–12. These are stable adapter keys, not global firmware
+parameter numbers. Other algorithm adapters can use the same callback contract;
+this revision does not claim universal property discovery.
+
+`change = {type = "nt_changed", properties = {key = {previous, value}},
+map_changed = boolean}` contains only changed property keys (previous omitted on
+first observation). The snapshot is authoritative at its observed map revision.
+Rapid changes between reads are coalesced; this is a one-second read watch, not
+an interrupt stream or a promise to report every intermediate value.
+
+The supplied Lua reacts to `first_socket` changes by returning `focus_socket`
+(zero-based) in its table document. Flutter scrolls/highlights that row without
+stealing text focus, and skips navigation during unsent edits. Colour/tag and
+other map changes rerender the acknowledged table. Notifications can return only
+a view document; they cannot invoke a write action. User gestures still use
+`handle` and the existing acknowledgement path, so refreshes cannot echo edits.
+
+Command 9 checks the existing lease and returns the current revision and property
+snapshot. An unchanged revision costs one small request; only a changed revision
+causes a consistent full-map read. Reads and edits never overlap. A native edit
+during a multi-record read, failed read, callback failure, or expired lease stops
+editing until explicit reload. No polling opens a new lease or retries a write.
+
+Draft conflicts retain the last displayed map and all unsent fields. The host
+checks for drafts both before and after evaluating Lua so typing during an
+in-flight refresh cannot be lost. Reload still asks before discarding drafts.
+The periodic watch stops on disposal and pauses with the inactive editor/app.
+
+Native First socket retains index 0; Cable colour and Tag append indices 1 and 2.
+The plug-in projects the selected record through callback-safe host setters with
+reentrancy protection; only changed native cable values advance map revision.
+Preset deserialization invalidates the lease and reprojects controls. Native text
+entry and physical-device acceptance remain pending.

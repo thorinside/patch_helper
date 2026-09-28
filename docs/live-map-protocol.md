@@ -116,3 +116,18 @@ array of `{type, name}` objects and exactly 20 + 8×count connection records.
 Version 1 remains readable and is still written for maps without expanders.
 The shared expanded-session fixture exercises Lua-dispatched edits against both
 Dart and the actual C++ factory, including rename, move and reload.
+
+## Revision 4 watch request
+
+Command `09`, empty payload, checks the lease but deliberately accepts an older
+revision. Reply header carries current map revision; payload is title text,
+expander count, one-based First socket, cable colour index, tag. All four numeric
+fields occupy one MIDI data byte each. It is read-only, does not advance revision,
+and never opens a lease. Trailing request bytes are invalid. A changed revision
+requires rereading banks/connections at that revision; conflict fails closed.
+
+Native colour/tag edits advance the same map revision as Helper writes. At
+revision exhaustion they invalidate the lease before resetting the revision.
+Selection-only changes do not mutate the map revision. `live-session.json`
+contains read frames interleaved with native parameter callbacks and is exercised
+by the actual C++ factory and the Dart client/Lua companion tests.

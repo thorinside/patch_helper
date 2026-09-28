@@ -23,7 +23,7 @@ inline bool isRequest(const uint8_t* data, std::size_t size) {
     if (size < kHeaderBytes || size > 120 ||
         std::memcmp(data, kPrefix, sizeof(kPrefix)) != 0) return false;
     for (std::size_t i = 0; i < size; ++i) if (data[i] > 127) return false;
-    return data[6] >= 1 && data[6] <= 8;
+    return data[6] >= 1 && data[6] <= 9;
 }
 template <std::size_t N>
 bool readText(const uint8_t*& data, const uint8_t* end, char (&text)[N]) {
@@ -46,7 +46,7 @@ inline void writeText(uint8_t*& data, const char* text) {
 // Caller validates/addresses the frame. Reply fits in 121 bytes and excludes F0/F7.
 inline std::size_t respond(PatchMap& map, Session& session,
                           const uint8_t* request, std::size_t size,
-                          uint8_t (&reply)[128]) {
+                          uint8_t (&reply)[128], int firstSocket = 0) {
     std::memcpy(reply, request, kHeaderBytes);
     reply[6] |= 0x40;
     auto status = Status::ok;
@@ -69,6 +69,16 @@ inline std::size_t respond(PatchMap& map, Session& session,
             }
         }
     } else if (lease == 0 || lease != session.lease) status = Status::expired;
+    else if (command == 9) {
+        if (data != end || firstSocket < 0 || firstSocket >= map.socketCount()) status = Status::invalid;
+        else {
+            writeText(output, map.title);
+            *output++ = static_cast<uint8_t>(map.expanderCount);
+            *output++ = static_cast<uint8_t>(firstSocket + 1);
+            *output++ = static_cast<uint8_t>(map.connections[firstSocket].colour);
+            *output++ = static_cast<uint8_t>(map.connections[firstSocket].tag);
+        }
+    }
     else if (revision != session.revision) status = Status::conflict;
     else if (command == 2) {
         if (end - data != 1 || *data >= map.socketCount()) status = Status::invalid;

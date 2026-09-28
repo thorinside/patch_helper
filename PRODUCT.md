@@ -38,13 +38,33 @@ An empty destination means unused. Unused sockets remain visible by default.
 Destination-based and socket-based views are in the discovery spec. The title
 and destination currently accept 63 printable ASCII characters, group 31.
 
-Revision 3 implements the Helper editor as a host-executed SD-card Lua
+Revision 4 extends the Helper editor as a host-executed SD-card Lua
 companion at `/helper/ThPh.lua`, backed by the USB map bridge. The file is
 discovered by plug-in GUID. It includes named, ordered expander banks and the
 approved table/minimap. Flutter renders the controls in Helper's existing theme.
-On-device text entry remains pending. Physical device acceptance and the
-exported preset envelope are unverified. Prototype interactions beyond current capability must be
-identified as proposals, not demonstrated as shipped behavior.
+Companion loading remains an explicit, trusted-code action; the source belongs
+to the editor/device session, with no persistent cache or silent bundled fallback.
+On-device destination, title, and group text entry remain pending. Physical
+device acceptance and the exported preset envelope are unverified. Prototype
+interactions beyond current capability must be identified as proposals, not
+demonstrated as shipped behavior.
+
+The NT exposes First socket, Cable colour, and Tag controls. Colour and Tag edit
+the selected socket's record. While the Helper editor and app are active, a
+one-second read watch observes these properties and map changes. Rapid changes
+between reads are coalesced. The optional Lua `on_change` callback receives the
+observed snapshot and changed fields; older companions fall back to `render`.
+The supplied companion follows First socket by highlighting and scrolling to
+its row without moving keyboard focus, and suspends this navigation during
+unsent edits.
+
+A native map change during an unsent row, title, or expander-name draft keeps
+the displayed map and draft text, then blocks editing until explicit reload.
+Reload asks before discarding unsent row or title edits. The expander-name
+dialog retains its text and disables Apply on a synchronization error, with
+guidance to copy the name before closing and reloading. Applying a name closes
+the dialog only after acknowledgement succeeds. Read or companion failures
+also require explicit reload; refreshes never replay a write.
 
 ## Evidence on Hand
 

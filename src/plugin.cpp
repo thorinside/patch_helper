@@ -11,35 +11,77 @@ struct Algorithm : _NT_algorithm {
     patch_helper::PatchMap map;
     patch_helper::PatchMap scratch;
     patch_helper::Session session;
-    _NT_parameter viewParameter{};
+    std::array<_NT_parameter, 3> definitions{};
+    bool projecting = false;
+    bool needsProjection = true;
 };
 constexpr _NT_parameter parameters[] = {
     {"First socket", 1, 20, 1, kNT_unitNone, 0, nullptr},
+    {"Cable colour", 0, patch_helper::kColourCount - 1, 0, kNT_unitEnum, 0, patch_helper::kColours},
+    {"Tag", 0, 12, 0, kNT_unitNone, 0, nullptr},
 };
-constexpr uint8_t viewParams[] = {0};
-constexpr _NT_parameterPage pages[] = {{"View", 1, 0, {0, 0}, viewParams}};
+constexpr uint8_t viewParams[] = {0, 1, 2};
+constexpr _NT_parameterPage pages[] = {{"Connection", 3, 0, {0, 0}, viewParams}};
 constexpr _NT_parameterPages parameterPages = {1, pages};
 
 void requirements(_NT_algorithmRequirements& req, const int32_t*) {
     req = {};
-    req.numParameters = 1;
+    req.numParameters = 3;
     req.sram = sizeof(Algorithm);
 }
 _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
                          const _NT_algorithmRequirements&, const int32_t*) {
     auto* algorithm = new (ptrs.sram) Algorithm();
-    algorithm->viewParameter = parameters[0];
-    algorithm->parameters = &algorithm->viewParameter;
+    std::copy(std::begin(parameters), std::end(parameters), algorithm->definitions.begin());
+    algorithm->parameters = algorithm->definitions.data();
     algorithm->parameterPages = &parameterPages;
     return algorithm;
 }
-// A descriptive map must never touch audio, CV, or routing.
+int selectedSocket(const Algorithm& algorithm) {
+    return std::clamp(algorithm.v ? int(algorithm.v[0]) - 1 : 0, 0, algorithm.map.socketCount() - 1);
+}
+
+// Project the selected record into native controls without treating these
+// host setter callbacks as new edits. Persistent cable data remains authoritative.
+void projectControls(Algorithm& algorithm) {
+    if (!algorithm.v) return;
+    algorithm.projecting = true;
+    const auto index = NT_algorithmIndex(&algorithm);
+    const auto offset = NT_parameterOffset();
+    const int socket = selectedSocket(algorithm);
+    const auto& row = algorithm.map.connections[socket];
+    const int values[] = {socket + 1, row.colour, row.tag};
+    for (int p = 0; p < 3; ++p) {
+        if (algorithm.v[p] != values[p]) NT_setParameterFromAudio(index, offset + p, values[p]);
+    }
+    algorithm.projecting = false;
+    algorithm.needsProjection = false;
+}
+
+void parameterChanged(_NT_algorithm* self, int p) {
+    auto& algorithm = *static_cast<Algorithm*>(self);
+    if (algorithm.projecting || !self->v || p < 0 || p > 2) return;
+    if (p == 0) { projectControls(algorithm); return; }
+    auto& row = algorithm.map.connections[selectedSocket(algorithm)];
+    const int value = std::clamp(int(self->v[p]), 0, p == 1 ? patch_helper::kColourCount - 1 : 12);
+    int& stored = p == 1 ? row.colour : row.tag;
+    if (stored != value) {
+        stored = value;
+        if (algorithm.session.revision == patch_helper::kMaxWireInteger) algorithm.session = {};
+        else ++algorithm.session.revision;
+    }
+    projectControls(algorithm);
+}
+
+// A descriptive map never touches audio, CV, or routing.
 void step(_NT_algorithm* self, float*, int) {
     auto& algorithm = *static_cast<Algorithm*>(self);
-    if (algorithm.viewParameter.max != algorithm.map.socketCount()) {
-        algorithm.viewParameter.max = algorithm.map.socketCount();
+    if (algorithm.definitions[0].max != algorithm.map.socketCount()) {
+        algorithm.definitions[0].max = algorithm.map.socketCount();
         NT_updateParameterDefinition(NT_algorithmIndex(self), 0);
+        algorithm.needsProjection = true;
     }
+    if (algorithm.needsProjection) projectControls(algorithm);
 }
 
 bool draw(_NT_algorithm* self) {
@@ -78,6 +120,7 @@ bool deserialise(_NT_algorithm* self, _NT_jsonParse& parse) {
     auto& algorithm = *static_cast<Algorithm*>(self);
     if (!patch_helper::readMap(algorithm.map, parse, algorithm.scratch)) return false;
     algorithm.session = {};
+    algorithm.needsProjection = true;
     return true;
 }
 void midiSysEx(const uint8_t* data, uint32_t size) {
@@ -90,7 +133,8 @@ void midiSysEx(const uint8_t* data, uint32_t size) {
     auto* algorithm = static_cast<Algorithm*>(slot.plugin());
     if (!algorithm) return;
     uint8_t reply[128]{};
-    const auto length = patch_helper::respond(algorithm->map, algorithm->session, data, size, reply);
+    const auto length = patch_helper::respond(algorithm->map, algorithm->session, data, size, reply, selectedSocket(*algorithm));
+    if (reply[20] == 0 && (data[6] == 3 || data[6] == 8)) algorithm->needsProjection = true;
     NT_sendMidiSysEx(kNT_destinationUSB, reply, static_cast<uint32_t>(length), true);
 }
 constexpr _NT_factory makeFactory() {
@@ -101,6 +145,7 @@ constexpr _NT_factory makeFactory() {
     factory.calculateRequirements = requirements;
     factory.construct = construct;
     factory.step = step;
+    factory.parameterChanged = parameterChanged;
     factory.draw = draw;
     factory.tags = kNT_tagUtility;
     factory.serialise = serialise;

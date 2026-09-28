@@ -11,7 +11,7 @@ assert struct.unpack_from('<HH', data, 16) == (1, 40), 'Expected ARM relocatable
 symbols = subprocess.check_output(['arm-none-eabi-nm', str(path)], text=True)
 assert any(line.split()[-2:] == ['T', 'pluginEntry'] for line in symbols.splitlines())
 allowed = {'NT_drawText', 'NT_intToString', 'memcpy', 'memset', 'strlen', 'strncpy', 'strcpy',
-           'NT_algorithmIndex', 'NT_updateParameterDefinition', 'strcat', 'NT_getSlot', 'NT_sendMidiSysEx', '_ZNK8_NT_slot4guidEv', '_ZNK8_NT_slot6pluginEv',
+           'NT_algorithmIndex', 'NT_parameterOffset', 'NT_setParameterFromAudio', 'NT_updateParameterDefinition', 'strcat', 'NT_getSlot', 'NT_sendMidiSysEx', '_ZNK8_NT_slot4guidEv', '_ZNK8_NT_slot6pluginEv',
            'memcmp', '_GLOBAL_OFFSET_TABLE_'}  # Required by position-independent ARM code.
 for line in symbols.splitlines():
     fields = line.split()

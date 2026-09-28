@@ -9,11 +9,14 @@ The plug-in displays a preset-owned map containing the twelve native
 inputs, eight native outputs, and manually added eight-output expanders. Each socket has a destination, cable colour,
 optional Tag (1–12), and group. An empty destination means unused. Clearing it
 preserves the other cable metadata. The SD-card Lua companion provides the Helper editor, including the map title.
-On-device text editing remains pending.
+On-device destination, group and title text editing remain pending.
 
-The NT screen shows four rows at a time. Use **View → First socket** to scroll.
+The NT screen shows four rows at a time. Use **Connection → First socket** to
+choose the first displayed socket. **Cable colour** and **Tag** edit that socket;
+Tag 0 means none. Switching sockets loads their stored colour/tag without
+changing either record.
 Unused sockets remain visible. Long destinations are clipped on screen only;
-the saved text is retained. Tags and groups are stored but are not yet displayed.
+the saved text is retained. Tag is visible in its native control; groups remain stored metadata.
 
 ## Development preview
 
@@ -44,3 +47,10 @@ connection or change routing. See the [companion contract](docs/companion-contra
 and [live map protocol](docs/live-map-protocol.md).
 See [development notes](docs/development.md) for build commands, format details,
 the originating Substrate spec, and the remaining integration work.
+
+While the editor is open and active, Helper checks for NT changes once a second.
+Moving First socket on the NT highlights its row in Helper. Native colour/tag
+edits update the table through the Lua companion. Clean maps refresh automatically;
+if the NT changes the map while Helper has unsent edits, those drafts remain
+visible and editing pauses until an explicit reload. A preset/session change
+also requires reload. The watch pauses when the editor or app is inactive.

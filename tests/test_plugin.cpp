@@ -81,6 +81,17 @@ void testProtocolBounds() {
     request.resize(21); request[6] = 2; request[16] = 2; request[20] = 19;
     assert(respond(map, session, request.data(), request.size(), reply) == 120);
     assert(reply[20] == 0 && reply[21] == 19 && reply[22] == 11 && reply[23] == 12);
+    request.resize(20); request[6] = 9; request[16] = 0;
+    respond(map, session, request.data(), request.size(), reply, 19);
+    assert(reply[20] == 0 && readInteger(reply + 16) == 2);
+    assert(reply[86] == 20 && reply[87] == 11 && reply[88] == 12);
+    request.push_back(0);
+    respond(map, session, request.data(), request.size(), reply, 19);
+    assert(reply[20] == 1 && session.revision == 2);
+    request.resize(20); request[12] = 42;
+    respond(map, session, request.data(), request.size(), reply, 19);
+    assert(reply[20] == 2);
+    request[12] = 43;
     session.revision = kMaxWireInteger;
     request.resize(20); request[6] = 4;
     writeInteger(request.data() + 16, kMaxWireInteger);
@@ -98,6 +109,14 @@ void testProtocolBounds() {
 int32_t NT_algorithmIndex(const _NT_algorithm*) { return 0; }
 void NT_updateParameterDefinition(uint32_t, uint32_t) {}
 
+uint32_t NT_parameterOffset() { return 7; }
+void NT_setParameterFromAudio(uint32_t index, uint32_t p, int16_t value) {
+    assert(index == 0 && p >= 7 && p < 10);
+    const_cast<int16_t*>(activeAlgorithm->v)[p - 7] = value;
+    const auto* f = reinterpret_cast<const _NT_factory*>(pluginEntry(kNT_selector_factoryInfo, 0));
+    f->parameterChanged(activeAlgorithm, p - 7);
+}
+
 int main(int argc, char** argv) {
     testProtocolBounds();
     assert(argc == 2);
@@ -110,13 +129,14 @@ int main(int argc, char** argv) {
     assert(pluginEntry(kNT_selector_numFactories, 0) == 1);
     _NT_algorithmRequirements req{};
     factory->calculateRequirements(req, nullptr);
-    assert(req.numParameters == 1 && req.dtc == 0 && req.dram == 0 && req.itc == 0);
+    assert(req.numParameters == 3 && req.dtc == 0 && req.dram == 0 && req.itc == 0);
     std::vector<std::max_align_t> memory((req.sram + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t));
     _NT_algorithmMemoryPtrs ptrs{reinterpret_cast<uint8_t*>(memory.data()), nullptr, nullptr, nullptr};
     auto* algorithm = factory->construct(ptrs, req, nullptr);
     activeAlgorithm = algorithm;
-    int16_t page = 1;
-    algorithm->v = &page;
+    int16_t values[] = {1, 0, 0};
+    auto& page = values[0];
+    algorithm->v = values;
     const auto load = [&](const Json& json) {
         JsonReader reader(json); _NT_jsonParse parse(&reader, 0);
         return factory->deserialise(algorithm, parse);
@@ -146,6 +166,39 @@ int main(int argc, char** argv) {
     assert(persistedExpanded["patch_helper"]["expanders"][1]["name"] == "Pitch");
     assert(persistedExpanded["patch_helper"]["connections"][28]["destination"] == "Plaits V/oct");
     assert(load(Json::object()));
+    // The exact host watch transcript includes real on-device parameter callbacks.
+    assert(load(Json::object()));
+    values[0] = 1;
+    factory->step(algorithm, nullptr, 0);
+    std::ifstream liveInput("tests/fixtures/live-session.json");
+    for (const auto& frame : Json::parse(liveInput)) {
+        if (frame.contains("parameter")) {
+            const int p = frame["parameter"][0];
+            values[p] = frame["parameter"][1];
+            factory->parameterChanged(algorithm, p);
+        } else {
+            const auto bytes = frame["request"].get<std::vector<uint8_t>>();
+            const auto expected = frame["response"].get<std::vector<uint8_t>>();
+            factory->midiSysEx(bytes.data(), bytes.size());
+            assert(std::vector<uint8_t>(expected.begin() + 1, expected.end() - 1) == midiReply);
+        }
+    }
+    assert(save()["patch_helper"]["connections"][19]["colour"] == 4);
+    assert(save()["patch_helper"]["connections"][19]["tag"] == 7);
+    // Changing selection projects controls without overwriting either record.
+    values[0] = 1; factory->parameterChanged(algorithm, 0);
+    assert(values[1] == 0 && values[2] == 0);
+    values[0] = 20; factory->parameterChanged(algorithm, 0);
+    assert(values[1] == 4 && values[2] == 7);
+    const auto nativeEdited = save();
+    assert(load(nativeEdited)); factory->step(algorithm, nullptr, 0);
+    assert(save() == nativeEdited && values[2] == 7);
+    // A smaller preset clamps both the value and the definition via host APIs.
+    values[0] = 124;
+    assert(load(Json::object())); factory->step(algorithm, nullptr, 0);
+    assert(values[0] == 20 && values[1] == 0 && values[2] == 0);
+    values[0] = 1;
+
     // Exercise the real factory MIDI callback, including malformed and stale writes.
     std::vector<uint8_t> request(20, 0);
     std::copy(std::begin(patch_helper::kPrefix), std::end(patch_helper::kPrefix), request.begin());
