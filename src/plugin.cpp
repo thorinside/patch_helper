@@ -10,11 +10,20 @@
 #include "patch_protocol.h"
 
 namespace {
+// Keep the three preview-era parameter indices for saved mappings, but expose
+// only independent per-socket controls on the native pages.
+constexpr int kLegacyParameters = 3;
+constexpr int kParameterCount = kLegacyParameters + 2 * patch_helper::kMaxSockets;
+static_assert(kParameterCount <= 256);
 struct Algorithm : _NT_algorithm {
     patch_helper::PatchMap map;
     patch_helper::PatchMap scratch;
     patch_helper::Session session;
-    std::array<_NT_parameter, 3> definitions{};
+    std::array<_NT_parameter, kParameterCount> definitions{};
+    std::array<std::array<uint8_t, 2>, patch_helper::kMaxSockets> pageIndices{};
+    std::array<std::array<char, 16>, patch_helper::kMaxSockets> pageNames{};
+    std::array<_NT_parameterPage, patch_helper::kMaxSockets> pages{};
+    _NT_parameterPages pageList{};
     bool projecting = false;
     bool needsProjection = true;
 };
@@ -23,13 +32,21 @@ constexpr _NT_parameter parameters[] = {
     {"Cable colour", 0, patch_helper::kColourCount - 1, 0, kNT_unitEnum, 0, patch_helper::kColours},
     {"Tag", 0, 12, 0, kNT_unitNone, 0, nullptr},
 };
-constexpr uint8_t viewParams[] = {0, 1, 2};
-constexpr _NT_parameterPage pages[] = {{"Connection", 3, 0, {0, 0}, viewParams}};
-constexpr _NT_parameterPages parameterPages = {1, pages};
+void socketName(char* name, int socket) {
+    if (socket < 20) {
+        std::strcpy(name, socket < 12 ? "Input " : "Output ");
+        NT_intToString(name + std::strlen(name), socket < 12 ? socket + 1 : socket - 11);
+    } else {
+        std::strcpy(name, "E");
+        NT_intToString(name + 1, (socket - 20) / 8 + 1);
+        std::strcat(name, " Out ");
+        NT_intToString(name + std::strlen(name), (socket - 20) % 8 + 1);
+    }
+}
 
 void requirements(_NT_algorithmRequirements& req, const int32_t*) {
     req = {};
-    req.numParameters = 3;
+    req.numParameters = kParameterCount;
     req.sram = sizeof(Algorithm);
 }
 _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
@@ -39,7 +56,16 @@ _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
     auto* algorithm = new (ptrs.sram) Algorithm();
     std::copy(std::begin(parameters), std::end(parameters), algorithm->definitions.begin());
     algorithm->parameters = algorithm->definitions.data();
-    algorithm->parameterPages = &parameterPages;
+    for (int socket = 0; socket < patch_helper::kMaxSockets; ++socket) {
+        const int colour = kLegacyParameters + 2 * socket;
+        algorithm->definitions[colour] = parameters[1];
+        algorithm->definitions[colour + 1] = parameters[2];
+        algorithm->pageIndices[socket] = {static_cast<uint8_t>(colour), static_cast<uint8_t>(colour + 1)};
+        socketName(algorithm->pageNames[socket].data(), socket);
+        algorithm->pages[socket] = {algorithm->pageNames[socket].data(), 2, 1, {0, 0}, algorithm->pageIndices[socket].data()};
+    }
+    algorithm->pageList = {patch_helper::kSocketCount, algorithm->pages.data()};
+    algorithm->parameterPages = &algorithm->pageList;
     return algorithm;
 }
 int selectedSocket(const Algorithm& algorithm) {
@@ -59,13 +85,37 @@ void projectControls(Algorithm& algorithm) {
     for (int p = 0; p < 3; ++p) {
         if (algorithm.v[p] != values[p]) NT_setParameterFromAudio(index, offset + p, values[p]);
     }
+    for (int s = 0; s < algorithm.map.socketCount(); ++s) {
+        const auto& connection = algorithm.map.connections[s];
+        const int p = kLegacyParameters + 2 * s;
+        if (algorithm.v[p] != connection.colour) NT_setParameterFromAudio(index, offset + p, connection.colour);
+        if (algorithm.v[p + 1] != connection.tag) NT_setParameterFromAudio(index, offset + p + 1, connection.tag);
+    }
     algorithm.projecting = false;
     algorithm.needsProjection = false;
 }
 
 void parameterChanged(_NT_algorithm* self, int p) {
     auto& algorithm = *static_cast<Algorithm*>(self);
-    if (algorithm.projecting || !self->v || p < 0 || p > 2) return;
+    if (algorithm.projecting || !self->v || p < 0 || p >= kParameterCount) return;
+    if (p >= kLegacyParameters) {
+        const int socket = (p - kLegacyParameters) / 2;
+        if (socket >= algorithm.map.socketCount()) return;
+        auto& row = algorithm.map.connections[socket];
+        const bool colour = (p - kLegacyParameters) % 2 == 0;
+        int& stored = colour ? row.colour : row.tag;
+        const int value = std::clamp(int(self->v[p]), 0, colour ? patch_helper::kColourCount - 1 : 12);
+        if (stored != value) {
+        algorithm.projecting = true;
+        NT_setParameterFromAudio(NT_algorithmIndex(self), NT_parameterOffset(), socket + 1);
+        algorithm.projecting = false;
+            stored = value;
+            if (algorithm.session.revision == patch_helper::kMaxWireInteger) algorithm.session = {};
+            else ++algorithm.session.revision;
+        }
+        projectControls(algorithm);
+        return;
+    }
     if (p == 0) { projectControls(algorithm); return; }
     auto& row = algorithm.map.connections[selectedSocket(algorithm)];
     const int value = std::clamp(int(self->v[p]), 0, p == 1 ? patch_helper::kColourCount - 1 : 12);
@@ -86,12 +136,17 @@ void step(_NT_algorithm* self, float*, int) {
         NT_updateParameterDefinition(NT_algorithmIndex(self), 0);
         algorithm.needsProjection = true;
     }
+    if (algorithm.pageList.numPages != static_cast<uint32_t>(algorithm.map.socketCount())) {
+        algorithm.pageList.numPages = algorithm.map.socketCount();
+        NT_updateParameterPages(NT_algorithmIndex(self));
+        algorithm.needsProjection = true;
+    }
     if (algorithm.needsProjection) projectControls(algorithm);
 }
 
 bool draw(_NT_algorithm* self) {
     const auto& algorithm = *static_cast<const Algorithm*>(self);
-    NT_drawText(0, 9, algorithm.map.title);
+
     int first = self->v ? self->v[0] - 1 : 0;
     if (first < 0) first = 0;
     if (first >= algorithm.map.socketCount()) first = algorithm.map.socketCount() - 1;
@@ -116,7 +171,13 @@ bool draw(_NT_algorithm* self) {
         std::strncpy(destination, connection.connected() ? connection.destination : "(unused)", 44);
         NT_drawText(77, y, destination, 15, kNT_textLeft, kNT_textTiny);
     }
-    return true;
+    return false; // Keep the native parameter line visible above the rows.
+}
+int parameterUiPrefix(_NT_algorithm*, int p, char* text) {
+    if (p < kLegacyParameters || p >= kParameterCount) return 0;
+    socketName(text, (p - kLegacyParameters) / 2);
+    std::strcat(text, " ");
+    return static_cast<int>(std::strlen(text));
 }
 void serialise(_NT_algorithm* self, _NT_jsonStream& stream) {
     patch_helper::writeMap(static_cast<Algorithm*>(self)->map, stream);
@@ -157,6 +218,7 @@ constexpr _NT_factory makeFactory() {
     factory.step = step;
     factory.parameterChanged = parameterChanged;
     factory.draw = draw;
+    factory.parameterUiPrefix = parameterUiPrefix;
     factory.tags = kNT_tagUtility;
     factory.serialise = serialise;
     factory.deserialise = deserialise;

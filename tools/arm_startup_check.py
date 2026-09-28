@@ -74,6 +74,10 @@ def run(elf_path, imports, fill):
             cpu.reg_write(UC_ARM_REG_R0, len(text))
         elif name == 'NT_drawText':
             drawn.append(string(r2).decode())
+        elif name in ('NT_updateParameterPages', 'NT_updateParameterDefinition'):
+            pass
+        elif name == 'NT_setParameterFromAudio':
+            write(0x20010002 + r1 * 2, struct.pack('<h', r2))
         elif name in ('NT_algorithmIndex', 'NT_parameterOffset'):
             cpu.reg_write(UC_ARM_REG_R0, 0)
         else:
@@ -99,11 +103,11 @@ def run(elf_path, imports, fill):
     assert 0 < sram_size < 65536
     cpu.mem_write(arena, bytes([fill]) * sram_size)
     # Parameters require halfword alignment, not word alignment.
-    cpu.mem_write(0x20010002, struct.pack('<hhh', 1, 0, 0))
+    cpu.mem_write(0x20010002, struct.pack('<251h', 1, *([0] * 250)))
     cpu.reg_write(UC_ARM_REG_R0, 0x20020000)
     cpu.reg_write(UC_ARM_REG_R1, 0x20010002)
     call('probe')
-    assert drawn == ['Patch Helper'] + [v for i in range(1, 5) for v in (f'In {i}', 'None', '(unused)')], drawn
+    assert drawn == [v for i in range(1, 5) for v in (f'In {i}', 'None', '(unused)')], drawn
 
 
 plugin, probe = map(pathlib.Path, sys.argv[1:])

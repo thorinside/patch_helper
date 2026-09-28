@@ -10,12 +10,13 @@ selected `/programs/helper/` for companions, separate from the plug-ins director
 - NT binary: `/programs/plug-ins/patch_helper.o`.
 - Host Lua companion: `/programs/helper/ThPh.lua`.
 - The development archive includes both paths. Copy its folders to the SD root.
-- In Helper, select the Patch Helper algorithm's standard view and choose
-  **Load SD companion**. It uses the existing whole-file SD download operation.
+- Selecting Patch Helper automatically loads the editor through the existing
+  whole-file SD download operation, reusing endpoint/GUID-scoped scratch files.
 - Helper runs the downloaded source on the computer; the NT never runs this Lua.
   No bundled hard-coded editor is used when the file is absent or incompatible.
-- **Reload companion & map** re-downloads the source and opens a fresh map lease.
-  Missing/failed companions leave ordinary parameter/spreadsheet views available.
+- Background checks refresh the SD source once per minute while active.
+  Missing/failed companions show an error and recover automatically after correction.
+  The ordinary parameter/spreadsheet views remain available.
 
 Discovery uses `/programs/helper/<GUID>.lua`, with case preserved and a four-character
 filename-safe GUID. The script must declare the same GUID. This convention is
@@ -97,7 +98,7 @@ an interrupt stream or a promise to report every intermediate value.
 
 The supplied Lua reacts to `first_socket` changes by returning `focus_socket`
 (zero-based) in its table document. Flutter scrolls/highlights that row without
-stealing text focus, and skips navigation during unsent edits. Colour/tag and
+stealing text focus, and skips navigation while fields are syncing. Colour/tag and
 other map changes rerender the acknowledged table. Notifications can return only
 a view document; they cannot invoke a write action. User gestures still use
 `handle` and the existing acknowledgement path, so refreshes cannot echo edits.
@@ -105,16 +106,23 @@ a view document; they cannot invoke a write action. User gestures still use
 Command 9 checks the existing lease and returns the current revision and property
 snapshot. An unchanged revision costs one small request; only a changed revision
 causes a consistent full-map read. Reads and edits never overlap. A native edit
-during a multi-record read, failed read, callback failure, or expired lease stops
-editing until explicit reload. No polling opens a new lease or retries a write.
+during a multi-record read or a failed read triggers automatic reconciliation.
+Valid edits update the visible rows and dots immediately, then coalesce for 300 ms.
+Desired fields are merged onto a fresh NT snapshot before writing, preserving
+unrelated NT changes. A lost acknowledgement is resolved by rereading; already
+matching values are not resent. Newer edits made during a write remain queued.
+There are no Apply/Discard or manual load/reload controls. Errors use fixed status
+indicators and overlays so feedback never shifts the table. The watch stops on
+disposal and pauses with the inactive editor/app.
 
-Draft conflicts retain the last displayed map and all unsent fields. The host
-checks for drafts both before and after evaluating Lua so typing during an
-in-flight refresh cannot be lost. Reload still asks before discarding drafts.
-The periodic watch stops on disposal and pauses with the inactive editor/app.
-
-Native First socket retains index 0; Cable colour and Tag append indices 1 and 2.
-The plug-in projects the selected record through callback-safe host setters with
-reentrancy protection; only changed native cable values advance map revision.
-Preset deserialization invalidates the lease and reprojects controls. Native text
-entry and physical-device acceptance remain pending.
+The original selector/colour/tag indices 0–2 remain for preview preset/mapping
+compatibility but are omitted from the visible pages. Socket N (zero-based) owns
+colour parameter `3 + 2*N` and tag `4 + 2*N`. Each active socket has a two-control
+page, grouped to preserve knob position when changing pages. Capacity for all
+251 definitions and 124 pages is reserved in calculateRequirements(); construct
+uses only that memory. The visible page count follows the active socket count;
+step calls `NT_updateParameterPages()` when it changes. Callback-safe setters
+project acknowledged records with reentrancy protection. The old selected-socket
+property still identifies the most recently edited native row for Lua callbacks.
+Preset deserialization invalidates the lease and reprojects controls.
+Native text entry remains pending.

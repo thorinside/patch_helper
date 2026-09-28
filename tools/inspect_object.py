@@ -13,7 +13,7 @@ assert 'Tag_CPU_unaligned_access: v6' not in attributes, 'Build must disable una
 symbols = subprocess.check_output(['arm-none-eabi-nm', str(path)], text=True)
 assert any(line.split()[-2:] == ['T', 'pluginEntry'] for line in symbols.splitlines())
 allowed = {'NT_drawText', 'NT_intToString', 'memcpy', 'memset', 'strlen', 'strncpy', 'strcpy',
-           'NT_algorithmIndex', 'NT_parameterOffset', 'NT_setParameterFromAudio', 'NT_updateParameterDefinition', 'strcat', 'NT_getSlot', 'NT_sendMidiSysEx', '_ZNK8_NT_slot4guidEv', '_ZNK8_NT_slot6pluginEv',
+           'NT_algorithmIndex', 'NT_parameterOffset', 'NT_setParameterFromAudio', 'NT_updateParameterDefinition', 'NT_updateParameterPages', 'strcat', 'NT_getSlot', 'NT_sendMidiSysEx', '_ZNK8_NT_slot4guidEv', '_ZNK8_NT_slot6pluginEv',
            }  # Only imports already used by this plug-in's host API contract.
 for line in symbols.splitlines():
     fields = line.split()

@@ -154,7 +154,7 @@ per instance. Moves preserve each bank's cable data. The map and deserialization
 scratch space are per-instance host-allocated SRAM, about 27 KiB combined.
 ARM stack inspection found deserialization at 48 bytes plus its bounded parser
 calls (largest individual frame 320 bytes), not a full expanded map on stack.
-The audio callback only updates the First socket parameter range when inventory
+The audio callback updates native page count and the legacy selector range when inventory
 changes; it leaves all audio/CV buffers untouched. Older initial-slice notes
 above describe revision 1 and must not be used to defer the Lua companion again.
 
@@ -168,3 +168,14 @@ source exactly. The reply omitted `F0`; the native host stub had incorrectly
 accepted that. Tests now require the opening delimiter and compare complete
 wire frames. The corrected callback also accepts independently retained input
 delimiters. Companion/map round-trip acceptance remains a separate check.
+
+
+## Per-socket native pages
+
+The native editor now exposes one page per active socket with independent colour
+and tag parameters. Definitions/page arrays are instance-owned fixed SRAM,
+reserved up front; no post-construction allocation or GOT is introduced. The
+three old parameter indices are retained but hidden from pages. New parameters
+append indices 3–250. `NT_updateParameterPages()` notifies the host when expander
+inventory changes. Native and ARM startup tests cover all parameter callbacks,
+page indices, independent rows, maximum bank bounds and the host notification.

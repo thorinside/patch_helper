@@ -121,10 +121,11 @@ void testProtocolBounds() {
 
 int32_t NT_algorithmIndex(const _NT_algorithm*) { return 0; }
 void NT_updateParameterDefinition(uint32_t, uint32_t) {}
+void NT_updateParameterPages(uint32_t) {}
 
 uint32_t NT_parameterOffset() { return 7; }
 void NT_setParameterFromAudio(uint32_t index, uint32_t p, int16_t value) {
-    assert(index == 0 && p >= 7 && p < 10);
+    assert(index == 0 && p >= 7 && p < 7 + 3 + 2 * patch_helper::kMaxSockets);
     const_cast<int16_t*>(activeAlgorithm->v)[p - 7] = value;
     const auto* f = reinterpret_cast<const _NT_factory*>(pluginEntry(kNT_selector_factoryInfo, 0));
     f->parameterChanged(activeAlgorithm, p - 7);
@@ -142,7 +143,7 @@ int main(int argc, char** argv) {
     assert(pluginEntry(kNT_selector_numFactories, 0) == 1);
     _NT_algorithmRequirements req{};
     factory->calculateRequirements(req, nullptr);
-    assert(req.numParameters == 3 && req.dtc == 0 && req.dram == 0 && req.itc == 0);
+    assert(req.numParameters == 3 + 2 * patch_helper::kMaxSockets && req.dtc == 0 && req.dram == 0 && req.itc == 0);
     std::vector<std::max_align_t> memory((req.sram + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t));
     _NT_algorithmMemoryPtrs ptrs{reinterpret_cast<uint8_t*>(memory.data()), nullptr, nullptr, nullptr};
     auto* algorithm = factory->construct(ptrs, req, nullptr);
@@ -158,7 +159,7 @@ int main(int argc, char** argv) {
         assert(midiReply.size() > 20 && midiReply[20] == 0);
         assert(midiWireReply.front() == 0xf0 && midiWireReply.back() == 0xf7);
     }
-    int16_t values[] = {1, 0, 0};
+    int16_t values[3 + 2 * patch_helper::kMaxSockets] = {1, 0, 0};
     auto& page = values[0];
     algorithm->v = values;
     const auto load = [&](const Json& json) {
@@ -209,6 +210,23 @@ int main(int argc, char** argv) {
     }
     assert(save()["patch_helper"]["connections"][19]["colour"] == 4);
     assert(save()["patch_helper"]["connections"][19]["tag"] == 7);
+    // Every active row has stable, independent native parameter indices.
+    assert(algorithm->parameterPages->numPages == 20);
+    for (int socket = 0; socket < 20; ++socket) {
+        const auto& nativePage = algorithm->parameterPages->pages[socket];
+        assert(nativePage.numParams == 2 && nativePage.group == 1);
+        assert(nativePage.params[0] == 3 + 2 * socket);
+        assert(nativePage.params[1] == 4 + 2 * socket);
+    }
+    assert(std::string(algorithm->parameterPages->pages[0].name) == "Input 1");
+    assert(std::string(algorithm->parameterPages->pages[12].name) == "Output 1");
+    values[3] = 8; factory->parameterChanged(algorithm, 3);
+    assert(save()["patch_helper"]["connections"][0]["colour"] == 8);
+    assert(values[1] == 8 && values[3 + 2 * 19] == 4);
+    values[3] = 0; factory->parameterChanged(algorithm, 3);
+    char prefix[kNT_parameterUiPrefixSize]{};
+    factory->parameterUiPrefix(algorithm, 3 + 2 * 123, prefix);
+    assert(std::string(prefix) == "E13 Out 8 ");
     // Changing selection projects controls without overwriting either record.
     values[0] = 1; factory->parameterChanged(algorithm, 0);
     assert(values[1] == 0 && values[2] == 0);
@@ -276,13 +294,18 @@ int main(int argc, char** argv) {
     assert(!load(invalidExpanded) && save() == expanded);
     factory->step(algorithm, nullptr, 0);
     assert(algorithm->parameters[0].max == patch_helper::kMaxSockets);
+    assert(algorithm->parameterPages->numPages == patch_helper::kMaxSockets);
+    assert(std::string(algorithm->parameterPages->pages[123].name) == "E13 Out 8");
+    values[250] = 12; factory->parameterChanged(algorithm, 250);
+    assert(save()["patch_helper"]["connections"][123]["tag"] == 12);
     assert(load(Json::object()));
 
     assert(defaults["patch_helper"]["connections"].size() == 20);
     assert(load(fixture));
     assert(save() == fixture);
+    page = 1;
     factory->draw(algorithm);
-    assert(drawn[0] == "Studio patch" && drawn[1] == "In 1");
+    assert(drawn[0] == "In 1");
     const auto saved = save();
     const auto reject = [&](Json json) { assert(!load(json)); assert(save() == saved); };
     auto broken = fixture; broken["patch_helper"]["version"] = 2; reject(broken);
@@ -312,7 +335,7 @@ int main(int argc, char** argv) {
         factory->step(algorithm, buses.data(), frames); assert(buses == before);
     }
     for (int16_t value : {int16_t(-32768), int16_t(1), int16_t(20), int16_t(32767)}) {
-        page = value; assert(factory->draw(algorithm));
+        page = value; assert(!factory->draw(algorithm));
     }
     patch_helper::Connection connection;
     connection.colour = 4; connection.tag = 12;

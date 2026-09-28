@@ -15,7 +15,7 @@ extern "C" void probe(uint8_t* memory, int16_t* values) {
     _NT_algorithmMemoryPtrs ptrs{memory, nullptr, nullptr, nullptr};
     auto* a = factory->construct(ptrs, req, nullptr);
     a->v = values;
-    for (int p = 0; p < 3; ++p) factory->parameterChanged(a, p);
+    for (int p = 0; p < static_cast<int>(req.numParameters); ++p) factory->parameterChanged(a, p);
     factory->step(a, nullptr, 16);
     factory->draw(a);
 }
