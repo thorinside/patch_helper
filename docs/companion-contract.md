@@ -69,7 +69,7 @@ acknowledgement failures, and the exact shared C++/Dart wire transcript.
 
 This revision includes editable expander names and order with record-preserving
 moves, repeated expander types, title/connection editing, and persistent state.
-The one-byte wire address bounds storage to 13 eight-output expanders (124 total
+The one-byte wire address preserves storage for 13 eight-output expanders (124 total
 sockets); this is a protocol capacity, not a hardware topology claim. Expanders
 are manually recorded, never auto-detected or configured for signal routing.
 
@@ -116,10 +116,12 @@ indicators and overlays so feedback never shifts the table. The watch stops on
 disposal and pauses with the inactive editor/app.
 
 The original selector/colour/tag indices 0–2 remain for preview preset/mapping
-compatibility but are omitted from the visible pages. Socket N (zero-based) owns
+compatibility. Older 13-bank maps expose these on a final compatibility page;
+ordinary maps omit them from visible pages. Socket N (zero-based) owns
 colour parameter `3 + 2*N` and tag `4 + 2*N`. Each active socket has a two-control
-page, grouped to preserve knob position when changing pages. Capacity for all
-251 definitions and 124 pages is reserved in calculateRequirements(); construct
+page, grouped to preserve knob position when changing pages. New maps support
+12 banks: the connected firmware accepts 240 plug-in parameters but rejects 241.
+Capacity for 235 definitions and 117 pages is reserved in calculateRequirements(); construct
 uses only that memory. The visible page count follows the active socket count;
 step calls `NT_updateParameterPages()` when it changes. Callback-safe setters
 project acknowledged records with reentrancy protection. The old selected-socket

@@ -125,7 +125,7 @@ void NT_updateParameterPages(uint32_t) {}
 
 uint32_t NT_parameterOffset() { return 7; }
 void NT_setParameterFromAudio(uint32_t index, uint32_t p, int16_t value) {
-    assert(index == 0 && p >= 7 && p < 7 + 3 + 2 * patch_helper::kMaxSockets);
+    assert(index == 0 && p >= 7 && p < 7 + 3 + 2 * patch_helper::kNativeSockets);
     const_cast<int16_t*>(activeAlgorithm->v)[p - 7] = value;
     const auto* f = reinterpret_cast<const _NT_factory*>(pluginEntry(kNT_selector_factoryInfo, 0));
     f->parameterChanged(activeAlgorithm, p - 7);
@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
     assert(pluginEntry(kNT_selector_numFactories, 0) == 1);
     _NT_algorithmRequirements req{};
     factory->calculateRequirements(req, nullptr);
-    assert(req.numParameters == 3 + 2 * patch_helper::kMaxSockets && req.dtc == 0 && req.dram == 0 && req.itc == 0);
+    assert(req.numParameters == 3 + 2 * patch_helper::kNativeSockets && req.dtc == 0 && req.dram == 0 && req.itc == 0);
     std::vector<std::max_align_t> memory((req.sram + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t));
     _NT_algorithmMemoryPtrs ptrs{reinterpret_cast<uint8_t*>(memory.data()), nullptr, nullptr, nullptr};
     auto* algorithm = factory->construct(ptrs, req, nullptr);
@@ -159,7 +159,7 @@ int main(int argc, char** argv) {
         assert(midiReply.size() > 20 && midiReply[20] == 0);
         assert(midiWireReply.front() == 0xf0 && midiWireReply.back() == 0xf7);
     }
-    int16_t values[3 + 2 * patch_helper::kMaxSockets] = {1, 0, 0};
+    int16_t values[3 + 2 * patch_helper::kNativeSockets] = {1, 0, 0};
     auto& page = values[0];
     algorithm->v = values;
     const auto load = [&](const Json& json) {
@@ -225,8 +225,8 @@ int main(int argc, char** argv) {
     assert(values[1] == 8 && values[3 + 2 * 19] == 4);
     values[3] = 0; factory->parameterChanged(algorithm, 3);
     char prefix[kNT_parameterUiPrefixSize]{};
-    factory->parameterUiPrefix(algorithm, 3 + 2 * 123, prefix);
-    assert(std::string(prefix) == "E13 Out 8 ");
+    factory->parameterUiPrefix(algorithm, 3 + 2 * 115, prefix);
+    assert(std::string(prefix) == "E12 Out 8 ");
     // Changing selection projects controls without overwriting either record.
     values[0] = 1; factory->parameterChanged(algorithm, 0);
     assert(values[1] == 0 && values[2] == 0);
@@ -271,12 +271,16 @@ int main(int argc, char** argv) {
     request[6] = 1; request[12] = 44; request[20] = 2;
     factory->midiSysEx(request.data(), request.size());
     assert(midiReply[20] == 0 && midiReply.back() == 0);
-    for (int i = 0; i < patch_helper::kMaxExpanders; ++i) {
+    for (int i = 0; i < patch_helper::kNativeExpanders; ++i) {
         request.resize(22); request[6] = 5; request[16] = i; request[20] = i % 4; request[21] = 0;
         factory->midiSysEx(request.data(), request.size());
         assert(midiReply[20] == 0);
     }
-    const auto expanded = save();
+    auto expanded = save();
+    // Old 13-bank maps remain readable without reserving rejected parameter counts.
+    expanded["patch_helper"]["expanders"].push_back({{"type", 0}, {"name", "Legacy"}});
+    for (int socket = patch_helper::kNativeSockets; socket < patch_helper::kMaxSockets; ++socket)
+        expanded["patch_helper"]["connections"].push_back({{"socket", socket}, {"destination", ""}, {"colour", 0}, {"tag", 0}, {"group", ""}});
     assert(expanded["patch_helper"]["connections"].size() == patch_helper::kMaxSockets);
     assert(expanded["patch_helper"]["expanders"].size() == patch_helper::kMaxExpanders);
     assert(load(expanded) && save() == expanded);
@@ -294,9 +298,10 @@ int main(int argc, char** argv) {
     assert(!load(invalidExpanded) && save() == expanded);
     factory->step(algorithm, nullptr, 0);
     assert(algorithm->parameters[0].max == patch_helper::kMaxSockets);
-    assert(algorithm->parameterPages->numPages == patch_helper::kMaxSockets);
-    assert(std::string(algorithm->parameterPages->pages[123].name) == "E13 Out 8");
-    values[250] = 12; factory->parameterChanged(algorithm, 250);
+    assert(algorithm->parameterPages->numPages == patch_helper::kNativeSockets + 1);
+    assert(std::string(algorithm->parameterPages->pages[116].name) == "Legacy bank 13");
+    values[0] = 124; factory->parameterChanged(algorithm, 0);
+    values[2] = 12; factory->parameterChanged(algorithm, 2);
     assert(save()["patch_helper"]["connections"][123]["tag"] == 12);
     assert(load(Json::object()));
 

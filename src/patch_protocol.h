@@ -112,7 +112,7 @@ inline std::size_t respond(PatchMap& map, Session& session,
         else { std::memcpy(map.title, title, sizeof(title)); ++session.revision; }
     }
     if (status == Status::ok && command == 5) {
-        if (end - data < 2 || *data > 3 || map.expanderCount == kMaxExpanders) status = Status::invalid;
+        if (end - data < 2 || *data > 3 || map.expanderCount >= kNativeExpanders) status = Status::invalid;
         else {
             Expander candidate;
             candidate.type = *data++;

@@ -8,11 +8,11 @@ it does not detect cables, route signals, or modify audio/CV.
 The plug-in displays a preset-owned map containing the twelve native
 inputs, eight native outputs, and manually added eight-output expanders. Each socket has a destination, cable colour,
 optional Tag (1–12), and group. An empty destination means unused. Clearing it
-preserves the other cable metadata. The SD-card Lua companion provides the Helper editor,.
+preserves the other cable metadata. The SD-card Lua companion provides the Helper editor.
 On-device destination and group text editing remain pending.
 
 The NT has one parameter page per socket: **Input 1–12**, **Output 1–8**,
-then **E1 Out 1–8** and subsequent expander banks. Each page has independent
+then **E1 Out 1–8** and subsequent expander banks, up to 12 banks. Each page has independent
 **Cable colour** and **Tag** controls. Tag 0 means none. Adding an expander in
 Helper adds eight pages on the NT automatically. The display keeps the native
 parameter line visible and shows cable records below it, following the last
@@ -22,8 +22,9 @@ the saved text is retained.
 ## Development preview
 
 The object is built against the pinned official API v13. Firmware compatibility,
-physical-device loading, preset recall, and end-of-chain preset behavior still
-need device verification. No firmware compatibility claim is made from a
+end-of-chain preset behavior and wider firmware compatibility remain pending.
+Loading, native page updates and two-way editor changes have been checked on
+the connected v1.19.0beta device. No firmware compatibility claim is made from a
 successful ARM build alone.
 
 For owner testing, the built `plugins/patch_helper.o` belongs under
@@ -46,7 +47,8 @@ including sockets without destination names. Save the preset normally to keep
 changes across preset loads. Status/error feedback does not move the table.
 
 Add NTX-8CV, ES-5, ESX-8GT, or ESX-8CV from the dropdown. Each adds eight physical
-output records. Expander section actions rename instances and move their whole
+output records. Older 13-bank maps remain readable; the last bank uses a
+**Legacy bank 13** selector page on the NT. Expander section actions rename instances and move their whole
 banks, retaining cable records. This does not configure an expander's electronic
 connection or change routing. See the [companion contract](docs/companion-contract.md)
 and [live map protocol](docs/live-map-protocol.md).

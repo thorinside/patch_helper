@@ -176,6 +176,31 @@ The native editor now exposes one page per active socket with independent colour
 and tag parameters. Definitions/page arrays are instance-owned fixed SRAM,
 reserved up front; no post-construction allocation or GOT is introduced. The
 three old parameter indices are retained but hidden from pages. New parameters
-append indices 3–250. `NT_updateParameterPages()` notifies the host when expander
+append indices 3–234 for the 20 native sockets and 12 expander banks. `NT_updateParameterPages()` notifies the host when expander
 inventory changes. Native and ARM startup tests cover all parameter callbacks,
 page indices, independent rows, maximum bank bounds and the host notification.
+
+
+## Connected-device verification, 2026-09-27
+
+On v1.19.0beta (Sep 16 2026), controlled builds with identical instance storage
+accepted 240 plug-in parameters and rejected 241, 242, 243, 247, 248, 249 and
+251. The 251-parameter build was also rejected in an empty preset. Moving the
+instance to DRAM did not resolve it. These are observed firmware limits, not a
+guarantee for other firmware. The final build uses 235 parameters plus the
+firmware Bypass parameter. New maps stop at 12 banks; the existing 13-bank wire
+and preset format is retained, with a selector/colour/tag compatibility page
+for old maps. No records are silently truncated.
+
+The final object loaded with the three existing built-in algorithms, restored
+the saved cable colours, and ran with Bypass Off. Adding an NTX-8CV in the live
+Helper editor changed the device's page response from 20 to 28 socket pages
+(plus its standard Algorithm page) without reconstructing the algorithm.
+Writing E1 Out 8 Tag = 7 and Cable colour = Blue through native parameter writes
+updated the Lua-rendered row and minimap automatically. Editing its destination
+in Helper appeared on the NT display without Apply. Native/ARM checks remain
+separate from this physical-device evidence.
+
+Saving and recalling `Patch Pages Test` retained the 28 socket pages, E1 Out 8
+Blue/tag 7, and the original Input 1 Purple/tag 1. The test destination was
+cleared before saving. End-of-chain preset merging remains unverified.

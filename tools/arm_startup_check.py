@@ -103,7 +103,7 @@ def run(elf_path, imports, fill):
     assert 0 < sram_size < 65536
     cpu.mem_write(arena, bytes([fill]) * sram_size)
     # Parameters require halfword alignment, not word alignment.
-    cpu.mem_write(0x20010002, struct.pack('<251h', 1, *([0] * 250)))
+    cpu.mem_write(0x20010002, struct.pack('<235h', 1, *([0] * 234)))
     cpu.reg_write(UC_ARM_REG_R0, 0x20020000)
     cpu.reg_write(UC_ARM_REG_R1, 0x20010002)
     call('probe')

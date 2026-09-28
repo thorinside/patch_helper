@@ -13,16 +13,16 @@ namespace {
 // Keep the three preview-era parameter indices for saved mappings, but expose
 // only independent per-socket controls on the native pages.
 constexpr int kLegacyParameters = 3;
-constexpr int kParameterCount = kLegacyParameters + 2 * patch_helper::kMaxSockets;
-static_assert(kParameterCount <= 256);
+constexpr int kParameterCount = kLegacyParameters + 2 * patch_helper::kNativeSockets;
+static_assert(kParameterCount <= 240);
 struct Algorithm : _NT_algorithm {
     patch_helper::PatchMap map;
     patch_helper::PatchMap scratch;
     patch_helper::Session session;
     std::array<_NT_parameter, kParameterCount> definitions{};
-    std::array<std::array<uint8_t, 2>, patch_helper::kMaxSockets> pageIndices{};
-    std::array<std::array<char, 16>, patch_helper::kMaxSockets> pageNames{};
-    std::array<_NT_parameterPage, patch_helper::kMaxSockets> pages{};
+    std::array<std::array<uint8_t, 2>, patch_helper::kNativeSockets> pageIndices{};
+    std::array<std::array<char, 16>, patch_helper::kNativeSockets> pageNames{};
+    std::array<_NT_parameterPage, patch_helper::kNativeSockets + 1> pages{};
     _NT_parameterPages pageList{};
     bool projecting = false;
     bool needsProjection = true;
@@ -56,7 +56,7 @@ _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
     auto* algorithm = new (ptrs.sram) Algorithm();
     std::copy(std::begin(parameters), std::end(parameters), algorithm->definitions.begin());
     algorithm->parameters = algorithm->definitions.data();
-    for (int socket = 0; socket < patch_helper::kMaxSockets; ++socket) {
+    for (int socket = 0; socket < patch_helper::kNativeSockets; ++socket) {
         const int colour = kLegacyParameters + 2 * socket;
         algorithm->definitions[colour] = parameters[1];
         algorithm->definitions[colour + 1] = parameters[2];
@@ -64,6 +64,8 @@ _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
         socketName(algorithm->pageNames[socket].data(), socket);
         algorithm->pages[socket] = {algorithm->pageNames[socket].data(), 2, 1, {0, 0}, algorithm->pageIndices[socket].data()};
     }
+    static constexpr uint8_t legacyIndices[] = {0, 1, 2};
+    algorithm->pages[patch_helper::kNativeSockets] = {"Legacy bank 13", 3, 0, {0, 0}, legacyIndices};
     algorithm->pageList = {patch_helper::kSocketCount, algorithm->pages.data()};
     algorithm->parameterPages = &algorithm->pageList;
     return algorithm;
@@ -85,7 +87,7 @@ void projectControls(Algorithm& algorithm) {
     for (int p = 0; p < 3; ++p) {
         if (algorithm.v[p] != values[p]) NT_setParameterFromAudio(index, offset + p, values[p]);
     }
-    for (int s = 0; s < algorithm.map.socketCount(); ++s) {
+    for (int s = 0; s < std::min(algorithm.map.socketCount(), patch_helper::kNativeSockets); ++s) {
         const auto& connection = algorithm.map.connections[s];
         const int p = kLegacyParameters + 2 * s;
         if (algorithm.v[p] != connection.colour) NT_setParameterFromAudio(index, offset + p, connection.colour);
@@ -106,9 +108,9 @@ void parameterChanged(_NT_algorithm* self, int p) {
         int& stored = colour ? row.colour : row.tag;
         const int value = std::clamp(int(self->v[p]), 0, colour ? patch_helper::kColourCount - 1 : 12);
         if (stored != value) {
-        algorithm.projecting = true;
-        NT_setParameterFromAudio(NT_algorithmIndex(self), NT_parameterOffset(), socket + 1);
-        algorithm.projecting = false;
+            algorithm.projecting = true;
+            NT_setParameterFromAudio(NT_algorithmIndex(self), NT_parameterOffset(), socket + 1);
+            algorithm.projecting = false;
             stored = value;
             if (algorithm.session.revision == patch_helper::kMaxWireInteger) algorithm.session = {};
             else ++algorithm.session.revision;
@@ -136,8 +138,9 @@ void step(_NT_algorithm* self, float*, int) {
         NT_updateParameterDefinition(NT_algorithmIndex(self), 0);
         algorithm.needsProjection = true;
     }
-    if (algorithm.pageList.numPages != static_cast<uint32_t>(algorithm.map.socketCount())) {
-        algorithm.pageList.numPages = algorithm.map.socketCount();
+    const auto pageCount = static_cast<uint32_t>(std::min(algorithm.map.socketCount(), patch_helper::kNativeSockets + 1));
+    if (algorithm.pageList.numPages != pageCount) {
+        algorithm.pageList.numPages = pageCount;
         NT_updateParameterPages(NT_algorithmIndex(self));
         algorithm.needsProjection = true;
     }
