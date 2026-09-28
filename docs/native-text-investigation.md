@@ -80,13 +80,49 @@ Readback used:
 F0 00 21 27 6D 00 50 01 00 00 01 F7
 ```
 
+## Firmware conversion verified in ARM emulation
+
+The owner's local `NT_1.19beta_18.zip` contains a firmware image whose embedded
+build date exactly matches the connected NT: Sep 16 2026 11:56:15. Its SHA-256 is
+`5c354798f2774cf4deb939e603a70f63a1b8a9f73d5e1c1d897f6ce009a3463b`.
+
+The `NT_updateParameterDefinition` export leads to the plug-in definition
+conversion routine. For ordinary unit values, that routine compares the SDK
+unit with 18 and substitutes 0 for values greater than or equal to 18. Values
+100 and above follow the separate routing-parameter path, which produces an
+enum property. The plug-in constructor uses the same conversion routine.
+
+`tools/check_firmware_text_type.py` locates the routine through the named SDK
+export and executes the actual instructions under Unicorn for every possible
+uint8 unit value. It rejects firmware with any other hash. Results:
+
+| SDK unit | Firmware property type |
+|---|---|
+| 0–17 | Same value |
+| 18–99 | 0 |
+| 100–255 | 1 |
+
+No SDK unit maps to native text type 18 in this build. This reproduces the
+physical-device metadata result without changing the connected device.
+
+```sh
+uv run --with unicorn --with capstone python tools/check_firmware_text_type.py \
+  /path/to/NT_1.19beta_18.zip
+```
+
+The script reads firmware locally; it does not patch, flash, or distribute it.
+Its inferred firmware-internal layout is used only in isolated emulation, not
+in the plug-in or on hardware.
+
 ## Remaining boundary
 
-The SDK unit-to-firmware-property conversion remains unresolved. Hardcoding 18
-in `_NT_parameter.unit` did not expose type 18 on this firmware; it exposed 0.
-The documented gain example exposed 16. Neither observation establishes access
-to the native text editor. Do not claim that changing a Flutter widget, adding
-only the string-message handler, or formatting text solves native editing.
+The connected firmware's SDK unit-to-property conversion prevents the required
+native text type from being exposed. Completion needs firmware support for
+plug-in text-input properties, including delivery of edits made by the module's
+text editor to the plug-in's storage. The verified MIDI receive path is ready
+to build on, but it is not evidence of the on-device editor's write path.
+Do not claim that changing a Flutter widget, adding only the string-message
+handler, or formatting text solves native editing.
 
 Once the editor declaration is established, implement destination, group and
 expander-name storage, preset round trips, and revision notifications in the
