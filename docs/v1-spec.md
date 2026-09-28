@@ -118,13 +118,17 @@ formatted display string is available. Retain independent socket pages and
 preset/mapping compatibility while respecting the measured parameter limit.
 Expander names must also remain visible and editable through native text entry.
 
-Investigation on 2026-09-28 identified firmware text-input unit 18 in Helper.
-The pinned and current public API v13 header exposes `parameterChanged(self,p)`
-and numeric display formatter `parameterString(self,p,v,buff)`; its enum does
-not declare unit 18. The connected nt-mcp examples checked so far demonstrate
-formatting and file selection, not delivery of an edited text value to a plugin.
-The native string/property-change bridge still needs a verified implementation
-example or contract; changing only the unit number is not yet validated.
+Investigation on 2026-09-28 verified that a plug-in can receive native SysEx
+`0x53` string writes in `midiSysEx`, store the text, and return it through
+`parameterString` / `0x50`. This receive path requires explicit plug-in code;
+the diagnostic's numeric `parameterChanged` callback did not receive the text.
+The built-in Mixer reports native text-input type 18, but the connected
+v1.19.0beta firmware (Sep 16 2026 11:56:15) converts SDK units 18–99 to 0.
+Executing that exact firmware conversion in ARM emulation for every uint8 unit
+confirmed that no plug-in unit produces native type 18. Full native editing
+therefore requires firmware/SDK support for declaring a text-input property
+and receiving commits from the module's editor. This remains required V1 work,
+not a deferred feature or permission to substitute a custom keyboard.
 
 ## Synchronization and Lua events
 
