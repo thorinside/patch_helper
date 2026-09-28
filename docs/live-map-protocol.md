@@ -32,13 +32,16 @@ Integers use four little-endian base-128 bytes (28 bits). All bytes inside the
 MIDI delimiters are 7-bit. The response echoes the header with command OR `40`,
 replaces revision with the current revision, then adds one status byte and data.
 Status is 0 success, 1 invalid request, 2 expired session, 3 revision conflict.
-The largest valid frame is 122 bytes, comfortably below Helper's 1024-byte limit.
+The largest valid frame is 123 bytes, comfortably below Helper's 1024-byte limit.
 Wrong prefixes, unsupported commands, invalid frames, and nonmatching slots are
 ignored. Valid requests with invalid payloads return status 1 without mutation.
 
 Text is a one-byte length followed by printable ASCII bytes (no terminator).
-Limits remain 63 characters for title/destination and 31 for group; these are
-explicit development format choices. Reject invalid text rather than truncate.
+New destinations, groups and expander names accept at most 32 characters.
+The hidden legacy title still accepts 63. Presets and reads preserve older
+63-character destinations; a connection write may retain that exact destination
+while changing other fields, but any replacement must fit 32 characters.
+Reject invalid text rather than truncate.
 
 | Command | Request payload | Successful response data |
 |---|---|---|
@@ -106,12 +109,12 @@ Additional commands:
 | 7 Rename expander | index, name text | empty |
 | 8 Move expander | from index, to index | empty |
 
-Types 0–3 are NTX-8CV, ES-5, ESX-8GT, ESX-8CV. Names are at most 31 printable
+Types 0–3 are NTX-8CV, ES-5, ESX-8GT, ESX-8CV. Names are at most 32 printable
 ASCII characters. Command 6 is a read; 5/7/8 increment revision once on success.
 A move shifts complete eight-socket banks and their metadata atomically. Native
 IDs stay 0–19; expander IDs follow in physical list order. Capacity is thirteen
 banks, derived from the 7-bit socket ID. Invalid payloads and overflow fail
-without mutation. Maximum frame size stays 122 bytes.
+without mutation. Maximum frame size stays 123 bytes.
 
 Helper reads title/count, every expander, and every configured socket under one
 lease/revision before exposing a map. Preset version 2 requires an `expanders`

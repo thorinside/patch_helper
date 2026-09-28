@@ -17,7 +17,8 @@ constexpr int kNativeSockets = kSocketCount + 8 * kNativeExpanders;
 constexpr int kMaxSockets = kSocketCount + 8 * kMaxExpanders;
 inline constexpr const char* kExpanders[] = {"NTX-8CV", "ES-5", "ESX-8GT", "ESX-8CV"};
 constexpr int kTextBytes = 64;
-constexpr int kGroupBytes = 32;
+constexpr int kEditableTextLength = 32;
+constexpr int kGroupBytes = kEditableTextLength + 1;
 // Internal linkage keeps PIC references relative, without a loader-created GOT.
 constexpr const char* kColours[] = {
     "None", "Black", "White", "Grey", "Red", "Orange", "Yellow",

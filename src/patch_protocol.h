@@ -104,7 +104,21 @@ inline std::size_t respond(PatchMap& map, Session& session,
             candidate.colour = *data++; candidate.tag = *data++;
             if (!readText(data, end, candidate.destination) ||
                 !readText(data, end, candidate.group) || data != end) status = Status::invalid;
-            else { map.connections[socket] = candidate; ++session.revision; }
+            else {
+                // Old presets may contain longer destinations. Preserve those
+                // unchanged during unrelated edits, but never create new ones.
+                bool unchanged = true;
+                for (std::size_t i = 0; i < sizeof(candidate.destination); ++i) {
+                    if (candidate.destination[i] != map.connections[socket].destination[i]) {
+                        unchanged = false;
+                        break;
+                    }
+                    if (!candidate.destination[i]) break;
+                }
+                if (std::strlen(candidate.destination) > kEditableTextLength && !unchanged)
+                    status = Status::invalid;
+                else { map.connections[socket] = candidate; ++session.revision; }
+            }
         }
     } else if (command == 4) {
         char title[kTextBytes]{};

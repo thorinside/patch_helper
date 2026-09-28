@@ -15,8 +15,8 @@ Patch Helper records physical connections involving disting NT and its
 expanders. It neither detects cables nor changes audio, CV, or internal routing.
 A recorded connection describes the user's intended patch, not verified wiring.
 There is one map per algorithm instance, owned by its containing NT preset.
-NT holds authoritative state. Helper is the primary editor; all table fields
-must also be available through the NT's native properties and editors.
+NT holds authoritative state. Helper is the primary editor. All table fields must also be visible on the NT;
+text editing on the module awaits firmware/SDK support.
 
 The implementation is the C++ algorithm `ThPh` in `thorinside/patch_helper`,
 with companion support in `No-Such-Device/nt_helper`. The host runs Lua downloaded
@@ -44,15 +44,18 @@ connections have separate rows. Auxiliary buses are not physical sockets.
 | Field | V1 representation |
 | --- | --- |
 | Socket | Stable local socket identity; read-only label |
-| Destination | One editable string, such as `reverb left`; up to 63 printable ASCII characters |
+| Destination | One editable string, such as `reverb left`; up to 32 printable ASCII characters for new edits |
 | Cable colour | None, Black, White, Grey, Red, Orange, Yellow, Green, Blue, Purple, Pink, Brown |
 | Tag | Optional integer 1–12; stored 0 means absent |
-| Group | Optional shared text, up to 31 printable ASCII characters |
+| Group | Optional shared text, up to 32 printable ASCII characters |
 
 A blank destination means unused. Clearing it preserves colour, tag, and group.
 The colour remains visible in the minimap even when destination is blank.
 Unsupported characters and overlong values are rejected, not silently truncated.
-These limits describe the current implementation, not general NT firmware limits.
+Existing preset destinations up to 63 characters remain readable and are never
+silently truncated. Unrelated colour, tag or group edits retain that text; a
+replacement destination must fit 32 characters. The hidden legacy title retains
+its old storage limit. Each 32-character field has room for its terminator.
 
 There is no editable patch title. The old serialized `title` field and transport
 operation remain solely for compatibility with preview data.
@@ -89,7 +92,7 @@ icons and coloured socket controls have accessible names.
 
 Supported models are NTX-8CV, ES-5, ESX-8GT and ESX-8CV. Every manually recorded
 instance has eight outputs. Repeated models are allowed. Instances can be named
-(up to 31 printable ASCII characters) and moved to match rack order; moving a
+(up to 32 printable ASCII characters) and moved to match rack order; moving a
 bank carries all eight connection records. This records physical hardware and
 does not configure its electronic connection or infer its presence.
 
@@ -109,26 +112,25 @@ The current implementation reserves 235 parameters and supports those two
 fields on the native pages. The algorithm display shows socket, colour and
 destination; display clipping never truncates the saved destination.
 
-**Required before full V1 parity is accepted:** surface destination and group as
-native text-input properties alongside colour and numeric tag, using the NT's
-existing text editor and property-change path. All table fields must be visible
-and editable on the module; socket identity stays read-only. Do not substitute
-a custom encoder keyboard or mark text editing as implemented just because a
-formatted display string is available. Retain independent socket pages and
-preset/mapping compatibility while respecting the measured parameter limit.
-Expander names must also remain visible and editable through native text entry.
+**Owner decision, 2026-09-28:** the firmware author confirmed that native editable
+text properties are not exposed in the C++ SDK yet, and that the planned limit
+is 32 characters. The owner accepts display-only native text for the current
+revision, with editing in Helper. Do not implement a custom keyboard or claim
+that native text editing works. Destination, group and expander names are
+limited to 32 characters for new edits in preparation for that API.
 
-Investigation on 2026-09-28 verified that a plug-in can receive native SysEx
-`0x53` string writes in `midiSysEx`, store the text, and return it through
-`parameterString` / `0x50`. This receive path requires explicit plug-in code;
-the diagnostic's numeric `parameterChanged` callback did not receive the text.
-The built-in Mixer reports native text-input type 18, but the connected
-v1.19.0beta firmware (Sep 16 2026 11:56:15) converts SDK units 18–99 to 0.
-Executing that exact firmware conversion in ARM emulation for every uint8 unit
-confirmed that no plug-in unit produces native type 18. Full native editing
-therefore requires firmware/SDK support for declaring a text-input property
-and receiving commits from the module's editor. This remains required V1 work,
-not a deferred feature or permission to substitute a custom keyboard.
+The SDK's `parameterString(self, p, v, buffer)` callback returns an entire
+NULL-terminated value, not a single character; its buffer is at least 64 bytes.
+Use `kNT_unitHasStrings` for native formatted values until editable strings are
+supported. Preserve the existing independent socket pages. The exact placement
+of text within those pages remains to be settled against parameter capacity;
+this decision does not authorize replacing the pages with a shared selector.
+
+Investigation on 2026-09-28 verified the diagnostic SysEx `0x53` receive path
+and `parameterString` / `0x50` readback, but that does not expose a native text
+editor. The connected v1.19.0beta build converts SDK units 18–99 to type 0.
+Native text editing is now a future firmware/SDK integration, not a current
+V1 acceptance requirement. Full native field display remains outstanding.
 
 ## Synchronization and Lua events
 
@@ -203,7 +205,7 @@ indicator remains at the top left. Native sanitizer tests, ARM object
 inspection and strict-alignment Unicorn startup checks are separate from hardware
 acceptance. No hardware acceptance is inferred solely from those tests.
 
-Outstanding: full native text-property editing and field parity; end-of-chain
+Outstanding: native text-property display and field parity; end-of-chain
 preset merge/lifecycle behavior; persistence of pending edits across editor/app
 lifecycle changes; wider firmware acceptance and production release review.
 

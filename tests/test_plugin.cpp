@@ -80,8 +80,10 @@ void testProtocolBounds() {
     assert(reply[20] == 0 && std::strlen(map.title) == 63);
     request.resize(20); request[6] = 3; request[16] = 1;
     request.insert(request.end(), {19, 11, 12, 63});
-    request.insert(request.end(), 63, 'D'); request.push_back(31);
-    request.insert(request.end(), 31, 'G');
+    request.insert(request.end(), 63, 'D'); request.push_back(32);
+    request.insert(request.end(), 32, 'G');
+    // Loaded legacy text can be retained while another field changes.
+    copyText(map.connections[19].destination, std::string(63, 'D').c_str());
     const auto original = map;
     for (std::size_t size = 20; size < request.size(); ++size) {
         assert(isRequest(request.data(), size));
@@ -92,7 +94,7 @@ void testProtocolBounds() {
     respond(map, session, request.data(), request.size(), reply);
     assert(reply[20] == 0 && session.revision == 2);
     request.resize(21); request[6] = 2; request[16] = 2; request[20] = 19;
-    assert(respond(map, session, request.data(), request.size(), reply) == 120);
+    assert(respond(map, session, request.data(), request.size(), reply) == 121);
     assert(reply[20] == 0 && reply[21] == 19 && reply[22] == 11 && reply[23] == 12);
     request.resize(20); request[6] = 9; request[16] = 0;
     respond(map, session, request.data(), request.size(), reply, 19);
@@ -131,8 +133,50 @@ void NT_setParameterFromAudio(uint32_t index, uint32_t p, int16_t value) {
     f->parameterChanged(activeAlgorithm, p - 7);
 }
 
+void testEditableTextLimits() {
+    using namespace patch_helper;
+    PatchMap map;
+    Session session{42, 0};
+    uint8_t reply[128]{};
+    auto writeRow = [&](const std::string& destination, const std::string& group) {
+        std::vector<uint8_t> request(20, 0);
+        std::copy(std::begin(kPrefix), std::end(kPrefix), request.begin());
+        request[6] = 3; request[12] = 42;
+        writeInteger(request.data() + 16, session.revision);
+        request.insert(request.end(), {0, 4, 7, static_cast<uint8_t>(destination.size())});
+        request.insert(request.end(), destination.begin(), destination.end());
+        request.push_back(static_cast<uint8_t>(group.size()));
+        request.insert(request.end(), group.begin(), group.end());
+        assert(isRequest(request.data(), request.size()));
+        respond(map, session, request.data(), request.size(), reply);
+        return reply[20];
+    };
+    assert(writeRow(std::string(32, 'D'), std::string(32, 'G')) == 0);
+    assert(session.revision == 1 && std::strlen(map.connections[0].destination) == 32);
+    assert(writeRow(std::string(33, 'D'), "") == 1);
+    assert(writeRow("", std::string(33, 'G')) == 1);
+    assert(session.revision == 1 && std::strlen(map.connections[0].group) == 32);
+    copyText(map.connections[0].destination, std::string(63, 'L').c_str());
+    assert(writeRow(std::string(63, 'L'), std::string(32, 'G')) == 0);
+    assert(writeRow(std::string(63, 'X'), "") == 1);
+    assert(std::strlen(map.connections[0].destination) == 63);
+    assert(writeRow("Short replacement", "") == 0);
+    for (const int length : {32, 33}) {
+        std::vector<uint8_t> request(20, 0);
+        std::copy(std::begin(kPrefix), std::end(kPrefix), request.begin());
+        request[6] = 5; request[12] = 42;
+        writeInteger(request.data() + 16, session.revision);
+        request.push_back(0); request.push_back(length);
+        request.insert(request.end(), length, 'E');
+        respond(map, session, request.data(), request.size(), reply);
+        assert(reply[20] == (length == 32 ? 0 : 1));
+    }
+    assert(map.expanderCount == 1 && std::strlen(map.expanders[0].name) == 32);
+}
+
 int main(int argc, char** argv) {
     testProtocolBounds();
+    testEditableTextLimits();
     assert(argc == 2);
     std::ifstream input(argv[1]);
     const auto fixture = Json::parse(input);
@@ -326,7 +370,7 @@ int main(int argc, char** argv) {
     }
     broken = fixture; broken["patch_helper"]["connections"][1]["socket"] = 0; reject(broken);
     broken = fixture; broken["patch_helper"]["connections"].erase(0); reject(broken);
-    broken = fixture; broken["patch_helper"]["connections"][0]["group"] = std::string(32, 'x'); reject(broken);
+    broken = fixture; broken["patch_helper"]["connections"][0]["group"] = std::string(33, 'x'); reject(broken);
     broken = fixture; broken["patch_helper"]["connections"][0]["destination"] = std::string(64, 'x'); reject(broken);
     // Input order is immaterial; socket identities define the stored order.
     auto reordered = fixture;

@@ -9,7 +9,10 @@ The plug-in displays a preset-owned map containing the twelve native
 inputs, eight native outputs, and manually added eight-output expanders. Each socket has a destination, cable colour,
 optional Tag (1–12), and group. An empty destination means unused. Clearing it
 preserves the other cable metadata. The SD-card Lua companion provides the Helper editor.
-On-device destination and group text editing remain pending.
+New destinations, groups and expander names accept up to 32 printable ASCII
+characters. Older longer destinations remain intact until replaced.
+On-device text editing awaits SDK support; the current target is read-only
+text display on the existing socket pages.
 
 The NT has one parameter page per socket: **Input 1–12**, **Output 1–8**,
 then **E1 Out 1–8** and subsequent expander banks, up to 12 banks. Each page has independent

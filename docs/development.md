@@ -6,7 +6,7 @@ Started from Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`,
 **Disting NT physical connection map and Helper companion interface**.
 The owner authorized development on 2026-09-27 and named the as-built baseline
 **V1** on 2026-09-28. [v1-spec.md](v1-spec.md) records the current scope and
-remaining acceptance work, including native text-property editing. The original
+remaining acceptance work, including native text-property display. The original
 brainstorming capture remains in source-spec.md. V1 is not a production tag.
 
 The live workflow now includes preset serialization, SD companion loading/cache,
@@ -48,11 +48,12 @@ native editor access.
   fields: `socket`, `destination`, `colour`, `tag`, `group`.
 - Colour IDs 0–11: None, Black, White, Grey, Red, Orange, Yellow, Green, Blue,
   Purple, Pink, Brown. Tag 0 means absent; 1–12 are the optional visible tags.
-- Title/destination buffers are 64 bytes including terminator, aligned with
-  the API's 64-byte display-string boundary. Group buffers are 32 bytes.
-  Printable ASCII only in this preview; these are explicit prototype memory
-  and display choices, not claimed firmware text limits. Revisit before UI
-  design and release. Both implementations reject unsupported input.
+- New destination, group and expander-name edits accept 32 printable ASCII
+  characters. Group/name buffers are 33 bytes including the terminator.
+  Destination/title storage remains 64 bytes to preserve preview presets.
+  An unchanged long destination may accompany edits to other fields; replacing
+  it requires at most 32 characters. Both implementations reject unsupported
+  input without truncation.
 - Empty destination means unused; metadata remains intact. Groups are stored
   without providing grouping UI yet. The palette and retention policy remain
   reviewable development defaults, not owner-approved spec decisions.
@@ -137,7 +138,8 @@ The native harness proves the callback payload, not that outer envelope.
 ## Remaining integration work
 
 See [V1](v1-spec.md) for current acceptance boundaries. Native text-property
-editing is required and under investigation; no custom text editor is approved.
+display is required. The owner accepts display-only text pending firmware/SDK
+support for native editing; no custom text editor is approved.
 End-of-chain preset merging and preservation of pending field edits across
 editor/app disposal remain open. Gear sorting/group presentation and arbitrary
 GUID adapters are deferred. SD loading, caching, automatic field reconciliation,

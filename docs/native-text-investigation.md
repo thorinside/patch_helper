@@ -129,3 +129,14 @@ expander-name storage, preset round trips, and revision notifications in the
 real plug-in. Preserve existing colour/tag parameter indices and address the
 measured 240-parameter ceiling before adding two fields for every socket.
 Do not silently reduce supported expanders or introduce a custom keyboard.
+
+## Owner update: display-only text accepted (2026-09-28)
+
+The owner supplied a conversation with the firmware author confirming that
+native editable string properties are currently unsupported in the plug-in SDK
+and will have a 32-character limit. The owner now accepts native display-only
+text pending that API. This supersedes the earlier insistence on native editing
+as a current acceptance gate. New destination, group and expander-name edits
+are limited to 32 characters; legacy longer destinations remain intact.
+The existing socket pages must remain. A full value is returned through
+`parameterString()` into the SDK's minimum 64-byte buffer.
