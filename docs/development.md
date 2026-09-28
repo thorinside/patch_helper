@@ -157,3 +157,14 @@ calls (largest individual frame 320 bytes), not a full expanded map on stack.
 The audio callback only updates the First socket parameter range when inventory
 changes; it leaves all audio/CV buffers untouched. Older initial-slice notes
 above describe revision 1 and must not be used to defer the Lua companion again.
+
+
+## Owner hardware check, 2026-09-27
+
+The owner confirmed that revision `275e282` loads, enables, and no longer
+crashes the NT. Loading the companion then timed out in the plug-in handshake.
+A direct SD download confirmed `/programs/helper/ThPh.lua` matched the repository
+source exactly. The reply omitted `F0`; the native host stub had incorrectly
+accepted that. Tests now require the opening delimiter and compare complete
+wire frames. The corrected callback also accepts independently retained input
+delimiters. Companion/map round-trip acceptance remains a separate check.

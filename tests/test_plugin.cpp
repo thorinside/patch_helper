@@ -45,12 +45,18 @@ int NT_intToString(char* output, int32_t value) {
 
 _NT_algorithm* activeAlgorithm = nullptr;
 std::vector<uint8_t> midiReply;
+std::vector<uint8_t> midiWireReply;
 bool NT_getSlot(_NT_slot& slot, uint32_t index) { slot.refCon = activeAlgorithm; return index == 0; }
 uint32_t _NT_slot::guid() const { return NT_MULTICHAR('T', 'h', 'P', 'h'); }
 _NT_algorithm* _NT_slot::plugin() const { return static_cast<_NT_algorithm*>(refCon); }
 void NT_sendMidiSysEx(uint32_t destination, const uint8_t* data, uint32_t size, bool end) {
     assert(destination == kNT_destinationUSB && end);
-    midiReply.assign(data, data + size);
+    // The API adds F7 only; the caller must supply the opening F0.
+    assert(size > 1 && data[0] == 0xf0);
+    assert(data[size - 1] != 0xf7);
+    midiWireReply.assign(data, data + size);
+    midiWireReply.push_back(0xf7);
+    midiReply.assign(data + 1, data + size);
 }
 
 void testProtocolBounds() {
@@ -141,6 +147,17 @@ int main(int argc, char** argv) {
     _NT_algorithmMemoryPtrs ptrs{reinterpret_cast<uint8_t*>(memory.data()), nullptr, nullptr, nullptr};
     auto* algorithm = factory->construct(ptrs, req, nullptr);
     activeAlgorithm = algorithm;
+    for (int framing = 0; framing < 4; ++framing) {
+        std::vector<uint8_t> message(21, 0);
+        std::copy(std::begin(patch_helper::kPrefix), std::end(patch_helper::kPrefix), message.begin());
+        message[6] = 1; message[12] = 100 + framing; message[20] = 2;
+        if (framing & 1) message.insert(message.begin(), 0xf0);
+        if (framing & 2) message.push_back(0xf7);
+        midiReply.clear();
+        factory->midiSysEx(message.data(), message.size());
+        assert(midiReply.size() > 20 && midiReply[20] == 0);
+        assert(midiWireReply.front() == 0xf0 && midiWireReply.back() == 0xf7);
+    }
     int16_t values[] = {1, 0, 0};
     auto& page = values[0];
     algorithm->v = values;
@@ -158,7 +175,7 @@ int main(int argc, char** argv) {
         const auto inputBytes = frame["request"].get<std::vector<uint8_t>>();
         const auto expectedBytes = frame["response"].get<std::vector<uint8_t>>();
         factory->midiSysEx(inputBytes.data(), inputBytes.size());
-        assert(std::vector<uint8_t>(expectedBytes.begin() + 1, expectedBytes.end() - 1) == midiReply);
+        assert(expectedBytes == midiWireReply);
     }
     assert(load(Json::object()));
     std::ifstream expandedWireInput("tests/fixtures/expanded-session.json");
@@ -166,7 +183,7 @@ int main(int argc, char** argv) {
         const auto bytes = frame["request"].get<std::vector<uint8_t>>();
         const auto expected = frame["response"].get<std::vector<uint8_t>>();
         factory->midiSysEx(bytes.data(), bytes.size());
-        assert(std::vector<uint8_t>(expected.begin() + 1, expected.end() - 1) == midiReply);
+        assert(expected == midiWireReply);
     }
     const auto persistedExpanded = save();
     assert(load(persistedExpanded) && save() == persistedExpanded);
@@ -187,7 +204,7 @@ int main(int argc, char** argv) {
             const auto bytes = frame["request"].get<std::vector<uint8_t>>();
             const auto expected = frame["response"].get<std::vector<uint8_t>>();
             factory->midiSysEx(bytes.data(), bytes.size());
-            assert(std::vector<uint8_t>(expected.begin() + 1, expected.end() - 1) == midiReply);
+            assert(expected == midiWireReply);
         }
     }
     assert(save()["patch_helper"]["connections"][19]["colour"] == 4);

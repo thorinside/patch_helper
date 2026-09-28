@@ -12,7 +12,10 @@ Use a direct USB connection to one NT. The experimental/non-commercial MIDI
 manufacturer ID `7D` is deliberately separate from Expert Sleepers' commands.
 Do not route this protocol to multiple NTs on the same MIDI endpoint: the public
 plug-in API does not expose the configured device SysEx ID or incoming port.
-Replies go to USB only. Hardware callback dispatch must still be verified.
+Replies go to USB only. `NT_sendMidiSysEx` receives the opening `F0` from
+the plug-in and appends `F7` when `end=true`. Incoming callback data tolerates
+either delimiter being retained or omitted. Native tests compare complete
+wire replies, including both delimiters.
 
 Every request is `F0 <header> <payload> F7`. The 20-byte header is:
 

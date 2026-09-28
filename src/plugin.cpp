@@ -129,18 +129,23 @@ bool deserialise(_NT_algorithm* self, _NT_jsonParse& parse) {
     return true;
 }
 void midiSysEx(const uint8_t* data, uint32_t size) {
-    // Firmware callbacks use unframed data; accepting framed input also makes
-    // the development bridge usable with hosts that retain MIDI delimiters.
-    if (size >= 2 && data[0] == 0xf0 && data[size - 1] == 0xf7) { ++data; size -= 2; }
+    // Accept callback payloads with either delimiter retained by the host.
+    if (size && data[0] == 0xf0) { ++data; --size; }
+    if (size && data[size - 1] == 0xf7) --size;
     if (!patch_helper::isRequest(data, size)) return;
     _NT_slot slot;
     if (!NT_getSlot(slot, data[7]) || slot.guid() != NT_MULTICHAR('T', 'h', 'P', 'h')) return;
     auto* algorithm = static_cast<Algorithm*>(slot.plugin());
     if (!algorithm) return;
-    uint8_t reply[128]{};
-    const auto length = patch_helper::respond(algorithm->map, algorithm->session, data, size, reply, selectedSocket(*algorithm));
-    if (reply[20] == 0 && (data[6] == 3 || data[6] == 8)) algorithm->needsProjection = true;
-    NT_sendMidiSysEx(kNT_destinationUSB, reply, static_cast<uint32_t>(length), true);
+    struct Reply {
+        uint8_t start = 0xf0;
+        uint8_t payload[128]{};
+    } reply;
+    static_assert(offsetof(Reply, payload) == 1);
+    const auto length = patch_helper::respond(algorithm->map, algorithm->session, data, size, reply.payload, selectedSocket(*algorithm));
+    if (reply.payload[20] == 0 && (data[6] == 3 || data[6] == 8)) algorithm->needsProjection = true;
+    // The host appends F7 when end=true; it does not supply the opening F0.
+    NT_sendMidiSysEx(kNT_destinationUSB, reinterpret_cast<const uint8_t*>(&reply), static_cast<uint32_t>(length + 1), true);
 }
 constexpr _NT_factory makeFactory() {
     _NT_factory factory{};
