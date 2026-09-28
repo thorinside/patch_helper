@@ -175,7 +175,7 @@ starts below the reserved top 12 pixels.
 
 No scroll gesture is used. Only the three pots and two encoder turns are claimed;
 encoder presses and other buttons remain firmware-owned. Selection automatically
-stays visible and highlights the entire row. Navigating changes no map fields,
+stays visible and brightens its channel label (15 selected, 8 unselected). Navigating changes no map fields,
 parameter values or revision.
 
 The list keeps four single-line rows at baselines 21, 34, 47 and 60. Connected
@@ -190,7 +190,8 @@ Every row shows socket, destination, cable colour, tag and group. Destination
 has a 27-character preview and group a 15-character preview, using the tiny font.
 Overflow ends with an ASCII ellipsis; stored 32-character text and legacy longer
 destinations remain intact, and the full strings remain on native parameter
-pages. Empty text/tag displays a dash. The full selected row is highlighted.
+pages. Empty text/tag displays a dash. Row backgrounds remain black; selection
+uses channel-label brightness without a highlight bar.
 
 ## Synchronization and Lua events
 

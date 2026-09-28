@@ -352,8 +352,7 @@ bool draw(_NT_algorithm* self) {
             NT_intToString(label + std::strlen(label), input ? socket + 1 : socket - 11);
         }
         const int y = 21 + row * 13;
-        if (socket == algorithm.uiSocket) NT_drawShapeI(kNT_rectangle, 0, y - 7, 255, y + 3, 1);
-        NT_drawText(0, y, label, 15, kNT_textLeft, kNT_textTiny);
+        NT_drawText(0, y, label, socket == algorithm.uiSocket ? 15 : 8, kNT_textLeft, kNT_textTiny);
         // Single-line table. Overflow is marked; the complete strings remain
         // in the native text properties and persistent map.
         char destination[28]{};

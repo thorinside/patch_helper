@@ -33,7 +33,7 @@ with four single-line socket rows below it. Its controls are:
 | Pot 3 or encoder 2 turn | Edit that value |
 
 All configured sockets can be selected. Selection automatically stays visible
-and highlights the whole row. Unused channels appear in the bottom row while
+and brightens the selected channel label. Unused channels appear in the bottom row while
 selected, with up to three connected rows above; colour and tag remain editable. Text fields remain
 read-only on the NT and are visible on the normal parameter pages. Pot 3 uses
 pickup after selection changes or encoder/remote edits to avoid accidental jumps.

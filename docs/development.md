@@ -339,3 +339,17 @@ remains owner acceptance. Helper required no change or restart.
 Impeccable's existing product context contains older text-editing and bank-limit
 claims. This scoped polish followed the live V1 spec and implementation instead;
 the unrelated product-context drift was not rewritten as part of this change.
+
+
+### Selection brightness correction (2026-09-28)
+
+Removed the filled selection rectangle because native text rendering cut into
+its background. Only the selected channel label is brighter (15 versus 8);
+the five-column layout, automatic visibility and unused-row editing are retained.
+Native sanitizer tests, ARM inspection and strict-alignment startup passed.
+The corrected object was uploaded and verified by exact SD readback (SHA-256
+`e1e0f71a4e89e8df1b4683e2a5dbc070aca80fd5b7c2abc9ee15046550ced424`).
+The fresh `/presets/PH 0928 114531.json` backup was restored. The live capture
+confirms black row backgrounds and label-only selection emphasis.
+
+![Selected channel label without a background bar](evidence/native-label-selection.png)
