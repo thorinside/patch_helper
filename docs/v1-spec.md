@@ -27,6 +27,14 @@ from the NT SD card. This is not a Lua audio algorithm running on the NT.
 - C++ object: `/programs/plug-ins/patch_helper.o`.
 - Lua companion: `/programs/helper/ThPh.lua`; the filename is the case-sensitive
   algorithm GUID, establishing a reusable convention for future companions.
+- The ZIP preserves both SD-root paths above. CI and `make package` use the
+  same packaging command. Helper's gallery installs companions before the C++
+  object, creating missing directories and preserving filenames. Upload errors
+  never fall back to the Lua-algorithm folder.
+- `programs/helper/*.lua` files are companion dependencies, excluded from Lua
+  algorithm counts and collection choices in Helper and NT Gallery. A C++ object
+  with its companion remains a C++ package; ordinary Lua algorithms keep their
+  existing classification. Local ZIP file-picker support is outside this change.
 - Selecting Patch Helper in Helper automatically loads the editor. There are
   no Load, Reload, Apply, or Discard buttons on the happy path.
 - Use Helper's existing whole-file SD transfer and endpoint/GUID-scoped scratch

@@ -38,7 +38,10 @@ build/arm_startup.o: tests/arm_startup.cpp distingNT_API/include/distingnt/api.h
 	$(ARM_CXX) $(COMMON) $(ARM_FLAGS) -c $< -o $@
 arm-smoke: hardware build/arm_startup.o
 	python3 tools/arm_startup_check.py plugins/patch_helper.o build/arm_startup.o
+package: inspect
+	python3 tools/package_preview.py
+
 verify: test inspect arm-smoke
 static-check:
 	cppcheck --enable=warning,style,performance,portability --std=c++17 --suppress=missingIncludeSystem --suppress='uninitMemberVarNoCtor:distingNT_API/include/distingnt/api.h' --suppress='noExplicitConstructor:distingNT_API/include/distingnt/serialisation.h' --error-exitcode=1 -I src -I distingNT_API/include src
-.PHONY: all hardware test inspect arm-smoke verify static-check native-text-probe read-only-text-probe
+.PHONY: package all hardware test inspect arm-smoke verify static-check native-text-probe read-only-text-probe

@@ -59,7 +59,21 @@ For owner testing, the built `plugins/patch_helper.o` belongs under
 tests. Saving and recalling the connected test preset has been verified; end-of-chain
 preset merging and standalone preset-file codec integration remain pending.
 
-Install `helper/ThPh.lua` in `/programs/helper/` on the SD card. Opening
+`make package` builds `build/patch_helper-preview.zip`, containing:
+
+```text
+programs/plug-ins/patch_helper.o
+programs/helper/ThPh.lua
+README.md
+```
+
+The development CI artifact uses the same package command. Extract the ZIP at
+the SD root, or install it through the matching NT Helper gallery support.
+Helper installs the Lua companion before the C++ object and creates its folder
+if needed. The companion is not a separate Lua algorithm. A failed upload is
+reported without retrying the file in another directory.
+
+For a manual install, put `helper/ThPh.lua` in `/programs/helper/` on the SD card. Opening
 Patch Helper in NT Helper automatically opens its editor. Helper runs the Lua
 on the computer and caches the downloaded source in scratch storage. It checks
 for updated Lua in the background. Missing files produce an error.

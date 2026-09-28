@@ -23,14 +23,8 @@ jobs:
       - name: Static analysis
         run: make static-check
       - name: Package development preview
-        run: |
-          mkdir -p build/package/programs/plug-ins build/package/programs/helper
-          cp plugins/patch_helper.o build/package/programs/plug-ins/
-          cp helper/ThPh.lua build/package/programs/helper/
-          cp README.md build/package/
-          cd build/package
-          zip -r ../../patch_helper-preview.zip .
+        run: make package
       - uses: actions/upload-artifact@v4
         with:
           name: patch-helper-development-preview
-          path: patch_helper-preview.zip
+          path: build/patch_helper-preview.zip
