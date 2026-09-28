@@ -7,6 +7,11 @@ ARM_FLAGS = -mcpu=cortex-m7 -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -mno-unalign
 
 all: hardware
 hardware: plugins/patch_helper.o
+build/native_text_probe.o: tools/native_text_probe.cpp distingNT_API/include/distingnt/api.h Makefile
+	mkdir -p build
+	$(ARM_CXX) $(COMMON) $(ARM_FLAGS) -c $< -o $@
+
+native-text-probe: build/native_text_probe.o
 plugins/patch_helper.o: src/plugin.cpp src/patch_map.h src/patch_protocol.h distingNT_API/include/distingnt/api.h Makefile
 	mkdir -p plugins
 	$(ARM_CXX) $(COMMON) $(ARM_FLAGS) -c $< -o $@
@@ -29,4 +34,4 @@ arm-smoke: hardware build/arm_startup.o
 verify: test inspect arm-smoke
 static-check:
 	cppcheck --enable=warning,style,performance,portability --std=c++17 --suppress=missingIncludeSystem --suppress='uninitMemberVarNoCtor:distingNT_API/include/distingnt/api.h' --suppress='noExplicitConstructor:distingNT_API/include/distingnt/serialisation.h' --error-exitcode=1 -I src -I distingNT_API/include src
-.PHONY: all hardware test inspect arm-smoke verify static-check
+.PHONY: all hardware test inspect arm-smoke verify static-check native-text-probe

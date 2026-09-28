@@ -18,15 +18,22 @@ and dynamic page updates. See the V1 spec for measured hardware evidence.
 The official [distingNT_API](https://github.com/expertsleepersltd/distingNT_API)
 is pinned at `9aeda6d41484815b80416b903a564510da6026cd` (API v13).
 `_NT_factory` exposes `serialise`, `deserialise`, and `parameterString`.
-The last callback formats numeric parameters; it is not an arbitrary writable
-string property. There is no factory callback for native string editing in
-this revision. Preset callbacks support custom state, and `midiSysEx` provides
-the custom USB transport specified in [live-map-protocol.md](live-map-protocol.md).
+The last callback supplies display text, as demonstrated by `examples/gain.cpp`.
+The firmware's `0x53` Set string parameter value message reaches the plug-in's
+`midiSysEx` callback: a handler can store the text and return it through
+`parameterString` when `0x50` requests the value. This was verified on hardware
+on 2026-09-28. It does not call `parameterChanged` on the diagnostic plug-in.
+Preset callbacks support custom state, and `midiSysEx` also provides the custom
+USB transport specified in [live-map-protocol.md](live-map-protocol.md).
 
 Helper has a built-in algorithm string-write path. Its bundled Lua controllers
 are pure projections of immutable slot snapshots and currently expose numeric
-controls. Neither fact demonstrates arbitrary plug-in string writes or shared
-state. Do not add a string widget and claim it solves this limitation.
+controls. The remaining native-editor issue is the property type conversion:
+declaring SDK unit `18` produced firmware-reported unit `0` in the probe,
+while the built-in Mixer reports `18` for its editable channel name.
+See [native-text-investigation.md](native-text-investigation.md) for the
+reproducer and the distinction between working string transport and unresolved
+native editor access.
 
 ## Prototype decisions
 

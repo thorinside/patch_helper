@@ -107,10 +107,15 @@ def run(elf_path, imports, fill):
     cpu.reg_write(UC_ARM_REG_R0, 0x20020000)
     cpu.reg_write(UC_ARM_REG_R1, 0x20010002)
     call('probe')
-    assert drawn == [v for i in range(1, 5) for v in (f'In {i}', 'None', '(unused)')], drawn
+    assert drawn == expected_drawn, drawn
 
 
-plugin, probe = map(pathlib.Path, sys.argv[1:])
+arguments = sys.argv[1:]
+expected_drawn = [v for i in range(1, 5) for v in (f'In {i}', 'None', '(unused)')]
+if arguments and arguments[0] == '--native-text-probe':
+    arguments = arguments[1:]
+    expected_drawn = ['Changes:', '3', 'Last parameter:', '2']
+plugin, probe = map(pathlib.Path, arguments)
 undefined = subprocess.check_output(['arm-none-eabi-nm', '-u', str(plugin)], text=True)
 imports = [line.split()[-1] for line in undefined.splitlines() if line.split()[-1] != '_GLOBAL_OFFSET_TABLE_']
 with tempfile.TemporaryDirectory(prefix='patch-helper-arm-') as folder:
