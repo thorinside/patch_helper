@@ -227,21 +227,32 @@ void step(_NT_algorithm* self, float*, int) {
     if (algorithm.needsProjection) projectControls(algorithm);
 }
 
-// Anchor by socket identity so updates above the viewport do not move it.
-// This bounded scan uses only stack storage and never changes preset state.
-int connectedWindow(Algorithm& algorithm, std::array<int, patch_helper::kMaxSockets>& sockets,
-                    int& count, int delta = 0) {
-    count = 0;
-    int first = 0;
-    for (int socket = 0; socket < algorithm.map.socketCount(); ++socket) {
-        if (!algorithm.map.connections[socket].connected()) continue;
-        if (socket < algorithm.firstVisibleSocket) ++first;
-        sockets[count++] = socket;
+// Connected rows provide context; an unused selection gets a temporary bottom
+// row. Selection always remains visible, including after edits or inventory changes.
+std::array<int, 4> visibleSockets(Algorithm& a) {
+    std::array<int, patch_helper::kMaxSockets> connected{};
+    std::array<int, 4> visible{-1, -1, -1, -1};
+    a.uiSocket = std::clamp(a.uiSocket, 0, a.map.socketCount() - 1);
+    int count = 0, selected = -1, before = 0, first = 0;
+    for (int socket = 0; socket < a.map.socketCount(); ++socket) {
+        if (!a.map.connections[socket].connected()) continue;
+        if (socket < a.firstVisibleSocket) ++first;
+        if (socket < a.uiSocket) ++before;
+        if (socket == a.uiSocket) selected = count;
+        connected[count++] = socket;
     }
-    const int last = std::max(0, count - 4);
-    first = std::clamp(std::clamp(first, 0, last) + delta, 0, last);
-    algorithm.firstVisibleSocket = count ? sockets[first] : 0;
-    return first;
+    const int slots = selected < 0 ? 3 : 4;
+    if (selected < 0) {
+        first = std::clamp(before - slots, 0, std::max(0, count - slots));
+        visible[3] = a.uiSocket;
+    } else {
+        first = std::clamp(first, 0, std::max(0, count - slots));
+        if (selected < first) first = selected;
+        else if (selected >= first + slots) first = selected - slots + 1;
+    }
+    for (int i = 0; i < slots && first + i < count; ++i) visible[i] = connected[first + i];
+    a.firstVisibleSocket = count ? connected[first] : 0;
+    return visible;
 }
 int uiValue(const Algorithm& algorithm) {
     const auto& row = algorithm.map.connections[std::clamp(algorithm.uiSocket, 0, algorithm.map.socketCount() - 1)];
@@ -249,7 +260,7 @@ int uiValue(const Algorithm& algorithm) {
 }
 int uiMaximum(const Algorithm& algorithm) { return algorithm.uiField ? 12 : patch_helper::kColourCount - 1; }
 uint32_t hasCustomUi(_NT_algorithm*) {
-    return kNT_potL | kNT_potC | kNT_potR | kNT_encoderL | kNT_encoderR | kNT_encoderButtonL;
+    return kNT_potL | kNT_potC | kNT_potR | kNT_encoderL | kNT_encoderR;
 }
 void setupUi(_NT_algorithm* self, _NT_float3& pots) {
     auto& a = *static_cast<Algorithm*>(self);
@@ -266,15 +277,6 @@ int potIndex(float position, int maximum) {
 }
 void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     auto& a = *static_cast<Algorithm*>(self);
-    std::array<int, patch_helper::kMaxSockets> sockets{};
-    int count;
-    if (data.controls & kNT_encoderButtonL) {
-        connectedWindow(a, sockets, count, data.encoders[0]);
-        // Scrolling never selects a channel or edits a cable, even if a pot moves.
-        if (std::isfinite(data.pots[2])) a.uiLastValuePot = data.pots[2];
-        a.uiValuePickup = true;
-        return;
-    }
     const int previousSocket = a.uiSocket;
     const int previousField = a.uiField;
     a.uiSocket = std::clamp(a.uiSocket, 0, a.map.socketCount() - 1);
@@ -283,15 +285,6 @@ void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     a.uiSocket = std::clamp(a.uiSocket + data.encoders[0], 0, a.map.socketCount() - 1);
     if ((data.controls & kNT_potC) && std::isfinite(data.pots[1])) a.uiField = potIndex(data.pots[1], 1);
     const bool selectionChanged = a.uiSocket != previousSocket || a.uiField != previousField;
-    if (a.uiSocket != previousSocket) {
-        const int first = connectedWindow(a, sockets, count);
-        for (int i = 0; i < count; ++i) {
-            if (sockets[i] != a.uiSocket) continue;
-            if (i < first) connectedWindow(a, sockets, count, i - first);
-            else if (i >= first + 4) connectedWindow(a, sockets, count, i - first - 3);
-            break;
-        }
-    }
     int value = uiValue(a);
     const int maximum = uiMaximum(a);
     if (selectionChanged || a.uiKnownValue != value) a.uiValuePickup = true;
@@ -321,6 +314,12 @@ void customUi(_NT_algorithm* self, const _NT_uiData& data) {
         NT_setParameterFromUi(index, offset + 1 + a.uiField, value);
     }
 }
+template <std::size_t N>
+void preview(char (&buffer)[N], const char* text) {
+    std::strncpy(buffer, *text ? text : "-", N - 1);
+    buffer[N - 1] = '\0';
+    if (std::strlen(text) >= N) std::strcpy(buffer + N - 4, "...");
+}
 bool draw(_NT_algorithm* self) {
     auto& algorithm = *static_cast<Algorithm*>(self);
     algorithm.uiSocket = std::clamp(algorithm.uiSocket, 0, algorithm.map.socketCount() - 1);
@@ -331,15 +330,17 @@ bool draw(_NT_algorithm* self) {
         if (uiValue(algorithm)) NT_intToString(value, uiValue(algorithm));
         else std::strcpy(value, "-");
     } else std::strcpy(value, patch_helper::kColours[uiValue(algorithm)]);
-    NT_drawShapeI(kNT_rectangle, 0, 0, 255, 11, 2);
-    NT_drawText(1, 9, channel, 15, kNT_textLeft, kNT_textNormal);
-    NT_drawText(87, 9, algorithm.uiField ? "Tag" : "Cable colour", 15, kNT_textLeft, kNT_textNormal);
-    NT_drawText(174, 9, value, 15, kNT_textLeft, kNT_textNormal);
-    std::array<int, patch_helper::kMaxSockets> sockets{};
-    int count;
-    const int first = connectedWindow(algorithm, sockets, count);
-    for (int row = 0; row < 4 && first + row < count; ++row) {
-        const int socket = sockets[first + row];
+    // Match the firmware's three separate cells, gaps, tones and baseline.
+    NT_drawShapeI(kNT_rectangle, 0, 0, 51, 9, 1);
+    NT_drawShapeI(kNT_rectangle, 60, 0, 128, 9, 1);
+    NT_drawShapeI(kNT_rectangle, 138, 0, 255, 9, 2);
+    NT_drawText(0, 8, channel, 15, kNT_textLeft, kNT_textNormal);
+    NT_drawText(60, 8, algorithm.uiField ? "Tag" : "Cable colour", 15, kNT_textLeft, kNT_textNormal);
+    NT_drawText(138, 8, value, 15, kNT_textLeft, kNT_textNormal);
+    const auto visible = visibleSockets(algorithm);
+    for (int row = 0; row < 4; ++row) {
+        const int socket = visible[row];
+        if (socket < 0) continue;
         const auto& connection = algorithm.map.connections[socket];
         char label[16]{};
         if (socket >= 20) {
@@ -351,13 +352,20 @@ bool draw(_NT_algorithm* self) {
             NT_intToString(label + std::strlen(label), input ? socket + 1 : socket - 11);
         }
         const int y = 21 + row * 13;
-        NT_drawText(0, y, label, socket == algorithm.uiSocket ? 15 : 8, kNT_textLeft, kNT_textTiny);
-        NT_drawText(33, y, patch_helper::kColours[connection.colour], 15, kNT_textLeft, kNT_textTiny);
-        // The complete destination remains in preset state; screen clipping is
-        // presentation only. The tiny font fits 44 characters in this column.
-        char destination[45]{};
-        std::strncpy(destination, connection.destination, 44);
-        NT_drawText(77, y, destination, 15, kNT_textLeft, kNT_textTiny);
+        if (socket == algorithm.uiSocket) NT_drawShapeI(kNT_rectangle, 0, y - 7, 255, y + 3, 1);
+        NT_drawText(0, y, label, 15, kNT_textLeft, kNT_textTiny);
+        // Single-line table. Overflow is marked; the complete strings remain
+        // in the native text properties and persistent map.
+        char destination[28]{};
+        char group[16]{};
+        preview(destination, connection.destination);
+        preview(group, connection.group);
+        NT_drawText(32, y, destination, 15, kNT_textLeft, kNT_textTiny);
+        NT_drawText(144, y, patch_helper::kColours[connection.colour], 15, kNT_textLeft, kNT_textTiny);
+        char tag[4] = "-";
+        if (connection.tag) NT_intToString(tag, connection.tag);
+        NT_drawText(188, y, tag, 15, kNT_textRight, kNT_textTiny);
+        NT_drawText(196, y, group, 12, kNT_textLeft, kNT_textTiny);
     }
     return true; // The SDK cannot select native UI focus; render the matching control row.
 }

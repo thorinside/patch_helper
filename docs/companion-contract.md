@@ -136,8 +136,10 @@ properties; editing remains in Helper until SDK support arrives.
 
 The NT custom view owns its channel / parameter / value strip: pot 1 or encoder
 1 selects the socket, pot 2 selects colour/tag, and pot 3 or encoder 2 edits it.
-Holding encoder 1 and turning it scrolls the connected list without changing
-map or property state. Normal native parameter pages remain available.
+Selection automatically stays visible in the five-column single-line list.
+An unused selected socket appears in the bottom row and remains editable for
+colour/tag. Long destination/group previews use ellipses. No scroll gesture is
+required, and navigation changes no map or property state. Normal native parameter pages remain available.
 
 ## Lua choice dialogs
 

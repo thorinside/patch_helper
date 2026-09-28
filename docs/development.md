@@ -303,3 +303,39 @@ The hardware screen below verifies layout and successful loading, not physical
 control feel; that remains owner acceptance.
 
 ![Custom controls above connected sockets](evidence/native-custom-controls.png)
+
+
+## Five-column selection-following list (2026-09-28)
+
+The owner accepted the custom control scheme and requested system-style header
+cells, automatic selection visibility, access to filtered unused sockets, and
+all table columns on one line. This supersedes the press-and-turn scroll gesture.
+The header now uses cell bounds 0–51, 60–128 and 138–255, background shades 1/1/2,
+and normal text at baseline 8, matching the observed system parameter row.
+
+The four list rows retain baselines 21, 34, 47 and 60. Columns are socket,
+destination (27-character preview), colour, tag, and group (15-character preview).
+Overflow ends in three ASCII dots; the persistent strings and full native text
+properties remain unchanged. The selected row has a full-width highlight.
+Connected selections scroll into view automatically. Unused selected sockets
+occupy the bottom row with up to three connected rows above; their colour/tag
+remain editable. An empty map still shows its selected unused socket. The left
+encoder press is no longer claimed.
+
+Native tests cover forward/backward selection, gaps, unused editing, empty maps,
+inventory shrink, all five fields, ellipses, and unchanged map/revision during
+navigation. Existing controls and pickup tests also pass, along with cppcheck,
+ARM object inspection and strict-alignment startup at two addresses.
+
+The uploaded object was read back exactly: SHA-256
+`654d0218f3af5d425267b319bd1a769c1ad097fe98c3c72d7734d2fb0a6093f5`.
+The working preset was backed up as `/presets/PH 0928 114135.json`, then restored.
+The live screen shows selected unused Output 3 in the bottom row and connected
+inputs above it, with all five columns visible. Broader physical control feel
+remains owner acceptance. Helper required no change or restart.
+
+![System-style header and five-column socket rows](evidence/native-five-column-list.png)
+
+Impeccable's existing product context contains older text-editing and bank-limit
+claims. This scoped polish followed the live V1 spec and implementation instead;
+the unrelated product-context drift was not rewritten as part of this change.

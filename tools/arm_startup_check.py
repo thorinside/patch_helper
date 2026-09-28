@@ -111,7 +111,7 @@ def run(elf_path, imports, fill):
 
 
 arguments = sys.argv[1:]
-expected_drawn = ['Input 1', 'Cable colour', 'None'] # Empty map, custom control row only.
+expected_drawn = ['Input 1', 'Cable colour', 'None', 'In 1', '-', 'None', '-', '-'] # Empty selection is visible.
 if arguments and arguments[0] == '--native-text-probe':
     arguments = arguments[1:]
     expected_drawn = ['Changes:', '3', 'Last parameter:', '2']

@@ -35,13 +35,17 @@ bool _NT_jsonParse::string(const char*& value) { return static_cast<JsonReader*>
 
 std::vector<std::string> drawn;
 std::vector<std::string> headerDrawn;
-void NT_drawText(int, int y, const char* text, int, _NT_textAlignment, _NT_textSize) {
-    if (y == 9) { headerDrawn.emplace_back(text); return; }
+std::vector<std::pair<int, int>> drawPositions;
+void NT_drawText(int x, int y, const char* text, int, _NT_textAlignment align, _NT_textSize) {
+    if (y == 8) { headerDrawn.emplace_back(text); return; }
     assert(y >= 21 && y <= 60); // Keep list text below the control row.
+    assert(align == (x == 188 ? kNT_textRight : kNT_textLeft));
+    drawPositions.emplace_back(x, y);
     drawn.emplace_back(text);
 }
 void NT_drawShapeI(_NT_shape shape, int x0, int y0, int x1, int y1, int) {
-    assert(shape == kNT_rectangle && x0 == 0 && y0 == 0 && x1 == 255 && y1 == 11);
+    assert(shape == kNT_rectangle && x0 >= 0 && y0 >= 0 && x1 <= 255 && y1 <= 63);
+    assert(y0 == 0 ? y1 == 9 : y0 >= 12);
 }
 int NT_intToString(char* output, int32_t value) {
     char text[12];
@@ -461,61 +465,70 @@ int main(int argc, char** argv) {
     page = 1;
     factory->draw(algorithm);
     assert(drawn[0] == "In 1");
-    // Connected-only viewport crosses input/output/expander gaps and is local UI state.
-    assert(factory->hasCustomUi(algorithm) == (kNT_potL | kNT_potC | kNT_potR | kNT_encoderL | kNT_encoderR | kNT_encoderButtonL));
+    // Selection-following list: connected context plus a temporary unused bottom row.
+    assert(factory->hasCustomUi(algorithm) == (kNT_potL | kNT_potC | kNT_potR | kNT_encoderL | kNT_encoderR));
     auto scrollMap = expanded;
     for (auto& row : scrollMap["patch_helper"]["connections"]) row["destination"] = "";
     for (int socket : {0, 5, 12, 20, 76, 83})
         scrollMap["patch_helper"]["connections"][socket]["destination"] = "Connected";
     assert(load(scrollMap)); factory->step(algorithm, nullptr, 0);
     const auto labels = [&]() {
-        drawn.clear(); assert(factory->draw(algorithm)); // Custom controls own the matching top row.
+        drawn.clear(); drawPositions.clear(); assert(factory->draw(algorithm));
         std::vector<std::string> result;
-        for (std::size_t i = 0; i < drawn.size(); i += 3) result.push_back(drawn[i]);
+        for (std::size_t i = 0; i < drawn.size(); i += 5) result.push_back(drawn[i]);
         return result;
     };
-    const auto scroll = [&](int rows) {
-        _NT_uiData ui{}; ui.controls = kNT_encoderButtonL; ui.encoders[0] = rows;
+    const auto selectSocket = [&](int socket) {
+        _NT_uiData ui{}; ui.controls = kNT_potL; ui.pots[0] = socket / 123.0f;
         factory->customUi(algorithm, ui);
     };
-    scroll(-128);
     assert((labels() == std::vector<std::string>{"In 1", "In 6", "Out 1", "E1:1"}));
-    const auto beforeScroll = save();
+    const auto beforeNavigation = save();
     const std::vector<int16_t> beforeValues(std::begin(values), std::end(values));
-    // Open a lease and compare the watch revision before/after scrolling.
     request.assign(21, 0);
     std::copy(std::begin(patch_helper::kPrefix), std::end(patch_helper::kPrefix), request.begin());
     request[6] = 1; request[12] = 45; request[20] = 2;
     factory->midiSysEx(request.data(), request.size());
     const auto beforeRevision = patch_helper::readInteger(midiReply.data() + 16);
-    _NT_uiData held{};
-    held.controls = kNT_encoderButtonL | kNT_potL | kNT_potC | kNT_potR;
-    held.pots[0] = held.pots[1] = held.pots[2] = 1.0f;
-    held.encoders[1] = 1;
-    factory->customUi(algorithm, held); // Modifier isolates scrolling from edits.
-    assert(labels().front() == "In 1");
-    scroll(1);
+    selectSocket(76);
     assert((labels() == std::vector<std::string>{"In 6", "Out 1", "E1:1", "E8:1"}));
-    scroll(127);
+    selectSocket(83);
     assert((labels() == std::vector<std::string>{"Out 1", "E1:1", "E8:1", "E8:8"}));
-    scroll(1); assert(labels().front() == "Out 1");
-    assert(save() == beforeScroll);
+    selectSocket(82);
+    assert((labels() == std::vector<std::string>{"Out 1", "E1:1", "E8:1", "E8:7"}));
+    selectSocket(81); assert(labels().back() == "E8:6");
+    selectSocket(123);
+    assert((labels() == std::vector<std::string>{"E1:1", "E8:1", "E8:8", "E13:8"}));
+    assert(save() == beforeNavigation);
     assert(beforeValues == std::vector<int16_t>(std::begin(values), std::end(values)));
     request.resize(20); request[6] = 9;
     factory->midiSysEx(request.data(), request.size());
     assert(midiReply[20] == 0 && patch_helper::readInteger(midiReply.data() + 16) == beforeRevision);
-    // A new connection above the viewport retains the first visible socket.
-    scrollMap["patch_helper"]["connections"][1]["destination"] = "New";
-    assert(load(scrollMap)); assert(labels().front() == "Out 1");
-    // Removing rows clamps the final window; clearing all rows draws no placeholders.
-    scrollMap["patch_helper"]["connections"][83]["destination"] = "";
-    assert(load(scrollMap)); assert(labels().front() == "In 6");
+    selectSocket(0); assert(labels().front() == "In 1");
+    scrollMap["patch_helper"]["connections"][0]["destination"] = "";
+    assert(load(scrollMap)); assert(labels().back() == "In 1");
     for (auto& row : scrollMap["patch_helper"]["connections"]) row["destination"] = "";
-    assert(load(scrollMap)); assert(labels().empty());
-    scroll(127); scroll(-128); assert(labels().empty());
-    scrollMap["patch_helper"]["connections"][83]["destination"] = "Only";
-    assert(load(scrollMap)); assert((labels() == std::vector<std::string>{"E8:8"}));
-    assert(load(fixture)); scroll(-128);
+    assert(load(scrollMap)); assert((labels() == std::vector<std::string>{"In 1"}));
+    assert((drawPositions == std::vector<std::pair<int, int>>{{0, 60}, {32, 60}, {144, 60}, {188, 60}, {196, 60}}));
+    // An empty selected socket is still editable and every table field is drawn.
+    selectSocket(83);
+    _NT_uiData editUnused{}; editUnused.encoders[1] = 1;
+    factory->customUi(algorithm, editUnused);
+    assert(save()["patch_helper"]["connections"][83]["colour"] == 1);
+    assert(save()["patch_helper"]["connections"][83]["destination"] == "");
+    assert((labels() == std::vector<std::string>{"E8:8"}));
+    scrollMap["patch_helper"]["connections"][83]["destination"] = std::string(32, 'D');
+    scrollMap["patch_helper"]["connections"][83]["group"] = std::string(32, 'G');
+    scrollMap["patch_helper"]["connections"][83]["tag"] = 12;
+    assert(load(scrollMap)); labels();
+    assert(drawn[1] == std::string(24, 'D') + "..." && drawn[3] == "12" && drawn[4] == std::string(12, 'G') + "...");
+    scrollMap["patch_helper"]["connections"][83]["destination"] = std::string(63, 'L');
+    assert(load(scrollMap)); labels();
+    assert(drawn[1] == std::string(24, 'L') + "...");
+    assert(save()["patch_helper"]["connections"][83]["destination"] == std::string(63, 'L'));
+    // A smaller map clamps the selected socket and keeps its unused row visible.
+    assert(load(fixture)); assert(labels().back() == "Out 8");
+    assert(load(scrollMap)); selectSocket(0);
     // Three pots and two encoders edit the displayed channel without UI focus APIs.
     assert(load(scrollMap));
     const auto sendUi = [&](int left, int right, uint16_t controls = 0,

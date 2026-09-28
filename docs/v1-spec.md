@@ -168,20 +168,29 @@ map revision path. Values and selections clamp at their bounds. Pot positions
 initialize through `setupUi`; pot 3 uses pickup after selection, encoder or
 remote changes to prevent jumping to an unrelated physical knob position.
 
-Holding encoder 1 while turning scrolls the connected list, one row per detent.
-While held, other edit inputs are ignored: scrolling changes no selected socket,
-field, parameter value, map content or revision. The previous button 1/4 scroll
-mapping is removed. Only the three pots, two encoder turns and encoder 1 press
-are claimed; other buttons remain firmware-owned.
+The top strip matches the native system row's three separate cells: channel at
+x=0, parameter at x=60 and value at x=138, with 9-pixel gaps and the firmware's
+background tones. Text uses the native normal font at baseline 8; the list
+starts below the reserved top 12 pixels.
 
-Up to four connected sockets appear at baselines 21, 34, 47 and 60, showing
-socket label, colour and destination. Nonempty destination defines connected;
-unused rows are omitted even if they retain colour or tag. Empty maps show only
-the top control strip. Scrolling is bounded and retains a filled last window
-when at least four rows exist. Socket selection brings that connection into view;
-manual scroll is otherwise independent. The first visible socket anchors the
-viewport across map updates and clamps when records disappear. All sockets
-remain available in the native pages and Helper table for editing.
+No scroll gesture is used. Only the three pots and two encoder turns are claimed;
+encoder presses and other buttons remain firmware-owned. Selection automatically
+stays visible and highlights the entire row. Navigating changes no map fields,
+parameter values or revision.
+
+The list keeps four single-line rows at baselines 21, 34, 47 and 60. Connected
+sockets appear in physical order. When an unused channel is selected, show it
+in the bottom row with up to three nearby connected sockets above it. It remains
+editable for colour/tag and disappears from the list on deselection if still
+unused. In an empty map the selected unused row is still shown at the bottom.
+Recompute visibility on drawing, so edits and inventory changes cannot hide the
+selected channel. All configured channels remain selectable with pot 1/encoder 1.
+
+Every row shows socket, destination, cable colour, tag and group. Destination
+has a 27-character preview and group a 15-character preview, using the tiny font.
+Overflow ends with an ASCII ellipsis; stored 32-character text and legacy longer
+destinations remain intact, and the full strings remain on native parameter
+pages. Empty text/tag displays a dash. The full selected row is highlighted.
 
 ## Synchronization and Lua events
 
@@ -253,8 +262,8 @@ Out 1 using an eight-bank test map; the working preset was restored afterward.
 The connected-list screen clears the top control strip. The owner reported that
 partial custom-control overrides interfered with native editing; the final
 control design explicitly owns channel, parameter and value navigation. Callback
-tests cover the pots, encoders, pickup, scrolling, bounds and unchanged state
-while scrolling. Physical control feel remains an owner acceptance check.
+tests cover the pots, encoders, pickup, selection visibility, unused-socket editing, single-line columns,
+ellipsis bounds and unchanged state while navigating. Physical control feel remains an owner acceptance check.
 
 The action dialog is covered by Flutter tests for all four choices, cancel and
 Escape, bank limits, invalid Lua schemas, stale actions and stable geometry.
