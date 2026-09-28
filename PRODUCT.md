@@ -18,7 +18,7 @@ then looking up those records when returning to a saved preset.
 
 ## Product Purpose
 
-Keep a named physical connection map with its NT preset. The map describes
+Keep a physical connection map with its NT preset. The map describes
 intended cabling; it does not detect connections or route audio/CV.
 
 ## Operating Context
@@ -30,45 +30,34 @@ on 2026-09-27, after approving the merge of revision 2.
 
 ## Capabilities and Constraints
 
-The current development format covers 12 inputs and 8 outputs, one destination
-per socket, a finite cable-colour palette, optional Tag 1–12, and optional group.
-Each manually added expander contributes eight outputs; repeated types are
-supported, with editable names and ordering.
-An empty destination means unused. Unused sockets remain visible by default.
-Destination-based and socket-based views are in the discovery spec. The title
-and destination currently accept 63 printable ASCII characters, group 31.
+The [V1 spec](docs/v1-spec.md) records the current baseline and open acceptance
+items. The editor shows 12 inputs, 8 outputs and eight outputs per expander,
+with destination, cable colour, optional numeric Tag (1–12), and group.
+Destination supports 63 printable ASCII characters; group and expander names
+support 31. Blank destination means unused and preserves other metadata.
+New maps support 12 banks; legacy 13-bank maps retain their records.
 
-Revision 4 extends the Helper editor as a host-executed SD-card Lua
-companion at `/programs/helper/ThPh.lua`, backed by the USB map bridge. The file is
-discovered by plug-in GUID. It includes named, ordered expander banks and the
-approved table/minimap. Flutter renders the controls in Helper's existing theme.
-Companion loading remains an explicit, trusted-code action; the source belongs
-to the editor/device session, with no persistent cache or silent bundled fallback.
-On-device destination, title, and group text entry remain pending. Physical
-device acceptance and the exported preset envelope are unverified. Prototype
-interactions beyond current capability must be identified as proposals, not
-demonstrated as shipped behavior.
+The host executes `/programs/helper/ThPh.lua` from the NT SD card. Loading,
+scratch caching, background source refresh and field synchronization are
+automatic. Valid edits appear immediately and reconcile until acknowledged
+while the editor session remains open; there is no durable offline outbox yet.
+There are no patch-title, Load, Reload, Apply/Discard, or narrative help controls.
 
-The NT exposes First socket, Cable colour, and Tag controls. Colour and Tag edit
-the selected socket's record. While the Helper editor and app are active, a
-one-second read watch observes these properties and map changes. Rapid changes
-between reads are coalesced. The optional Lua `on_change` callback receives the
-observed snapshot and changed fields; older companions fall back to `render`.
-The supplied companion follows First socket by highlighting and scrolling to
-its row without moving keyboard focus, and suspends this navigation during
-unsent edits.
+The NT currently has a colour/tag parameter page per socket, with dynamic page
+updates. Full native field parity is required: destination, group and expander
+name must use the NT's existing text-property editor, not a custom keyboard.
+The C++ string/property-change bridge is still under investigation.
 
-A native map change during an unsent row, title, or expander-name draft keeps
-the displayed map and draft text, then blocks editing until explicit reload.
-Reload asks before discarding unsent row or title edits. The expander-name
-dialog retains its text and disables Apply on a synchronization error, with
-guidance to copy the name before closing and reloading. Applying a name closes
-the dialog only after acknowledgement succeeds. Read or companion failures
-also require explicit reload; refreshes never replay a write.
+A one-second active watch supplies Lua `on_change` with authoritative map and
+property changes. Local fields merge with unrelated native edits. Socket focus
+updates use the minimap highlight without stealing keyboard focus. Loading,
+sync, validation and error feedback must never shift the layout.
 
 ## Evidence on Hand
 
-Source spec: Substrate d4abe223-d4c5-4784-811b-417aa43586ee, a discovery draft.
+Source spec: Substrate d4abe223-d4c5-4784-811b-417aa43586ee, updated as V1.
+The owner reported the connected build working well. Specific automated and
+hardware checks, and outstanding acceptance, are listed in the V1 spec.
 Code and wire fixtures in this repository and the adjacent nt_helper repository.
 Helper's committed light/dark screenshots and current AppTheme establish the
 incumbent visual language. Prototype cable names are illustrative sample data.
@@ -78,7 +67,7 @@ incumbent visual language. Prototype cable names are illustrative sample data.
 - Make the physical socket and recorded destination unambiguous.
 - Keep editing fast while retaining enough list context to avoid the wrong jack.
 - Distinguish sent-to-device state from saved-preset state.
-- Recover from uncertain edits by reloading authoritative device state.
+- Reconcile uncertain edits automatically against authoritative device state.
 
 ## Approved Editor and Remaining Scope
 
@@ -86,10 +75,14 @@ The user selected a straight table with a coloured clickable socket minimap.
 Inputs are 3 rows × 4 columns; outputs 4 rows × 2 columns; each expander
 8 rows × 1 column. Groups appear left to right in that order. The editor
 offers NTX-8CV, ES-5, ESX-8GT and ESX-8CV. Selecting a coloured minimap dot
-scrolls to and highlights its table row. Native text entry, the gear-sorted view,
-ordinary/end-of-chain preset lifecycle acceptance, and shared-state adapters for
-additional algorithms remain separate work.
+scrolls to and highlights its table row. Native text-property editing remains required for V1 parity. End-of-chain
+preset merging remains unverified. Gear-sorted presentation and adapters for
+additional algorithms are deferred.
 
 The user explicitly requires Flutter visual quality to remain as polished as
 the approved prototype; Lua is not a presentation limitation. Tag is a plain
 optional integer input rather than a dropdown.
+
+Sync status remains at the top left. Actions sit at the top right; Add expander
+opens a Lua-defined model-choice dialog rendered with Flutter. Model selection
+is not permanently visible. Cancel and Escape make no change.

@@ -1,7 +1,7 @@
 # SD-card Helper companion contract
 
 Source: Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`, reread 2026-09-27
-and captured in `source-spec.md`. The user approved the straight table/minimap
+and captured in `source-spec.md`; [V1](v1-spec.md) is the current baseline. The user approved the straight table/minimap
 and reiterated host-executed SD-card Lua as required. The user then explicitly
 selected `/programs/helper/` for companions, separate from the plug-ins directory.
 
@@ -43,20 +43,20 @@ rows, colour swatches, and focus using the existing Material theme.
 Events are `set_connection`, `set_title`, `add_expander`, `rename_expander`, and
 `move_expander`. `handle` returns one declarative action of the same kind. The
 host validates the action through the shared model and uses the serialized
-PatchMapClient transport. Lua cannot send MIDI directly. No automatic write
-replay occurs. The view changes to acknowledged state only after success.
+PatchMapClient transport. Lua cannot send MIDI directly. Field writes use optimistic display and automatic reconciliation as described below.
+Structural operations remain acknowledged transactions.
 
 ## Loading and recovery boundary
 
-Only load companion code from a source you trust. There is an explicit load
-button; no scripts run merely by inserting a card. Source is held only for that
-editor/device session, and a reconnect creates a new session. There is no
-persistent source cache or silent bundled fallback.
+Only load companion code from a source you trust. Selecting the algorithm loads
+its SD companion automatically through the existing whole-file transfer path.
+The source is cached in endpoint/GUID-scoped scratch storage and refreshed in
+the background; there is no load/reload control or silent bundled fallback.
 
 Execution uses a disposable Dart isolate with a two-second deadline. Source and
 serialized result budgets are 64 KiB each. Filesystem/process/network/module
 loading and debug globals are removed. An exception or timeout disables edits
-until reload. These controls protect responsiveness and constrain available
+until automatic source refresh recovers. These controls protect responsiveness and constrain available
 APIs; Dart isolates do not provide a hard per-script memory quota or a security
 boundary against deliberately hostile allocation. This is a trusted-companion
 development preview, not a general untrusted-code marketplace.
@@ -68,14 +68,15 @@ its returned grids, declarative actions, missing/invalid/infinite scripts,
 acknowledgement failures, and the exact shared C++/Dart wire transcript.
 
 This revision includes editable expander names and order with record-preserving
-moves, repeated expander types, title/connection editing, and persistent state.
+moves, repeated expander types, connection editing, and persistent state.
+The title field/action remain a wire compatibility detail, not an editor feature.
 The one-byte wire address preserves storage for 13 eight-output expanders (124 total
 sockets); this is a protocol capacity, not a hardware topology claim. Expanders
 are manually recorded, never auto-detected or configured for signal routing.
 
-NT-side text entry, a gear-sorted alternative, arbitrary companion discovery,
-and regular/end-of-chain preset lifecycle acceptance remain separate work from
-the approved Helper table. No physical-device acceptance is implied by tests.
+Native text-property editing is required for V1 field parity and is still pending.
+Gear-sorted presentation and arbitrary companion adapters are deferred. Regular
+preset recall has hardware evidence; end-of-chain merging remains unverified. No physical-device acceptance is implied by tests.
 
 ## Live NT properties (revision 4)
 
@@ -128,3 +129,19 @@ project acknowledged records with reentrancy protection. The old selected-socket
 property still identifies the most recently edited native row for Lua callbacks.
 Preset deserialization invalidates the lease and reprojects controls.
 Native text entry remains pending.
+
+## Lua choice dialogs
+
+`render` may return `actions`, a list of `{id, label, dialog}` entries. The current
+capability supports `id = 'add_expander'` and `dialog = {type = 'choice_dialog',
+title, cancel, choices = {{label, value}, ...}}`. Choices are unique model indices
+0–3. Missing actions means no toolbar actions, so earlier companions remain
+compatible. Invalid/duplicate action IDs and choices fail validation.
+
+Flutter places the action icon at the top right and retains sync status at the
+top left, in a fixed-height bar. It renders the Lua title and choices as a modal
+choice list; no permanent model dropdown remains. Selecting a model dispatches
+`add_expander` through the existing `handle` path. The latest map and Lua action
+are revalidated on selection; Lua cannot remap the selected model. Cancel,
+Escape and barrier dismissal do not mutate the map. No file-loading buttons or
+success narratives are introduced.

@@ -1,3 +1,5 @@
+Historical brainstorming capture; superseded by [V1](v1-spec.md).
+
 Source: Substrate d4abe223-d4c5-4784-811b-417aa43586ee
 Retrieved 2026-09-27. User's later table/minimap approval refines the layout; SD-card host Lua remains required.
 

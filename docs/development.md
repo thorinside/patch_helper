@@ -4,13 +4,14 @@
 
 Started from Substrate spec `d4abe223-d4c5-4784-811b-417aa43586ee`,
 **Disting NT physical connection map and Helper companion interface**.
-The user authorized beginning development in this repository and supporting
-work in `../nt_helper` on 2026-09-27. The spec remains an unapproved discovery
-draft; this slice does not imply that its remaining decisions are settled.
+The owner authorized development on 2026-09-27 and named the as-built baseline
+**V1** on 2026-09-28. [v1-spec.md](v1-spec.md) records the current scope and
+remaining acceptance work, including native text-property editing. The original
+brainstorming capture remains in source-spec.md. V1 is not a production tag.
 
-This first slice proves a preset-data boundary: native socket inventory,
-validation, atomic decoding, serialization, an NT display, and matching Helper
-code. It does not yet provide an end-to-end patch editing workflow.
+The live workflow now includes preset serialization, SD companion loading/cache,
+automatic field reconciliation, the table/minimap, native colour/tag pages,
+and dynamic page updates. See the V1 spec for measured hardware evidence.
 
 ## Verified API findings
 
@@ -126,24 +127,15 @@ contract. Confirm the firmware's actual custom-data envelope from an exported
 device preset before wiring this codec into user-facing preset operations.
 The native harness proves the callback payload, not that outer envelope.
 
-## Next integration slices
+## Remaining integration work
 
-1. Verify the revision-2 USB bridge on hardware: callback dispatch, USB reply
-   delivery, preset replacement, and dirty/preset-save semantics. Automated
-   tests cover wire compatibility, conflicts, and interrupted transfers.
-2. Implement the NT text-entry workflow against real API capabilities; expose
-   title/destination/metadata edits and retain native preset ownership.
-3. Add Helper state snapshots and host-owned declarative write actions, then
-   the connection-map editor (gear/socket views). Avoid embedding raw MIDI or
-   a mutable second state store in Lua.
-4. Resolve expander models/topology, naming, limits, sorting, grouping UI, and
-   ordinary versus end-of-chain preset behavior with the owner.
-5. Treat SD-card companion discovery/execution as a separate framework slice:
-   manifest/version compatibility, trust, isolated execution budgets, loading,
-   removal, and failure fallback. Existing bundled controllers do not provide
-   a sandbox for arbitrary downloaded Lua.
-
-No production tag, device deployment, or Substrate approval has been performed.
+See [V1](v1-spec.md) for current acceptance boundaries. Native text-property
+editing is required and under investigation; no custom text editor is approved.
+End-of-chain preset merging and preservation of pending field edits across
+editor/app disposal remain open. Gear sorting/group presentation and arbitrary
+GUID adapters are deferred. SD loading, caching, automatic field reconciliation,
+and regular preset recall now have implementation and test/device evidence.
+No production tag or Substrate readiness approval is implied by this baseline.
 
 ## Editor revision supersedes the initial-slice limitations
 

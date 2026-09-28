@@ -31,9 +31,8 @@ For owner testing, the built `plugins/patch_helper.o` belongs under
 `programs/plug-ins/` on the SD card. Restart or remount the card, then select
 **Patch Helper** from Add algorithm. New instances show unused sockets. The
 [fixture](tests/fixtures/native-map.json) exercises populated maps in native
-tests. Before editing a hardware preset, export a preset containing the plugin
-and confirm where the firmware embeds its custom serialization object; that
-outer preset envelope has not yet been verified on a device.
+tests. Saving and recalling the connected test preset has been verified; end-of-chain
+preset merging and standalone preset-file codec integration remain pending.
 
 Install `helper/ThPh.lua` in `/programs/helper/` on the SD card. Opening
 Patch Helper in NT Helper automatically opens its editor. Helper runs the Lua
@@ -46,12 +45,14 @@ the editor is up to date. Cable-colour changes also update the **Sockets** dots,
 including sockets without destination names. Save the preset normally to keep
 changes across preset loads. Status/error feedback does not move the table.
 
-Add NTX-8CV, ES-5, ESX-8GT, or ESX-8CV from the dropdown. Each adds eight physical
+Use the **+** action at the top right to choose NTX-8CV, ES-5, ESX-8GT, or ESX-8CV
+in a dialog. The sync indicator remains at the top left. Each adds eight physical
 output records. Older 13-bank maps remain readable; the last bank uses a
 **Legacy bank 13** selector page on the NT. Expander section actions rename instances and move their whole
 banks, retaining cable records. This does not configure an expander's electronic
 connection or change routing. See the [companion contract](docs/companion-contract.md)
 and [live map protocol](docs/live-map-protocol.md).
+See the [V1 spec](docs/v1-spec.md) for the as-built baseline and remaining acceptance work.
 See [development notes](docs/development.md) for build commands, format details,
 the originating Substrate spec, and the remaining integration work.
 
