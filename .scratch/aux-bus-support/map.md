@@ -20,6 +20,7 @@ Plan and implement AUX bus records in the existing Patch Helper plugin and compa
 - Preserve existing presets and parameter mappings. The current model records physical connections and does not route signals.
 - The companion is helper/ThPh.lua; Flutter rendering and the shared client live in the adjacent nt_helper repository. Coordinate changes across both repositories.
 - Keep completed work committed and pushed. A release needs its own approval.
+- Review [feat: add selected AUX bus records and a Lua-defined editor](https://github.com/thorinside/patch_helper/pull/4) together with [feat: render Lua-defined Patch Helper tables with AUX and saved widths](https://github.com/No-Such-Device/nt_helper/pull/157). Both are draft PRs; no release has been published.
 - Implementation is complete in the plugin, Lua companion and adjacent Helper branch. Native sanitizers, ARM startup/object checks and cppcheck pass. Helper analysis is clean; its full 4,018-test suite and the final seven editor tests pass. Physical AUX save/recall remains unverified.
 
 ## Decisions so far
