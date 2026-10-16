@@ -11,6 +11,7 @@ enum class Status : uint8_t { ok, invalid, expired, conflict };
 struct Session {
     uint32_t lease = 0;
     uint32_t revision = 0;
+    bool supportsAux = false;
 };
 inline uint32_t readInteger(const uint8_t* data) {
     return data[0] | (uint32_t(data[1]) << 7) |
@@ -25,7 +26,7 @@ inline bool isRequest(const uint8_t* data, std::size_t size) {
     for (std::size_t i = 0; i < sizeof(kPrefix); ++i)
         if (data[i] != kPrefix[i]) return false;
     for (std::size_t i = 0; i < size; ++i) if (data[i] > 127) return false;
-    return data[6] >= 1 && data[6] <= 9;
+    return data[6] >= 1 && data[6] <= 14;
 }
 template <std::size_t N>
 bool readText(const uint8_t*& data, const uint8_t* end, char (&text)[N]) {
@@ -48,7 +49,7 @@ inline void writeText(uint8_t*& data, const char* text) {
 // Caller validates/addresses the frame. Reply fits in 121 bytes and excludes F0/F7.
 inline std::size_t respond(PatchMap& map, Session& session,
                           const uint8_t* request, std::size_t size,
-                          uint8_t (&reply)[128], int firstSocket = 0) {
+                          uint8_t (&reply)[128], int firstSocket = 0, int selectedAux = 0) {
     std::memcpy(reply, request, kHeaderBytes);
     reply[6] |= 0x40;
     auto status = Status::ok;
@@ -59,15 +60,16 @@ inline std::size_t respond(PatchMap& map, Session& session,
     const uint8_t* end = request + size;
     uint8_t* output = reply + kHeaderBytes + 1;
     if (command == 1) {
-        const bool extended = end - data == 1 && *data == 2;
+        const bool extended = end - data == 1 && (*data == 2 || *data == 3);
         if ((data != end && !extended) || lease == 0 || lease == session.lease) status = Status::invalid;
         else {
             session.lease = lease;
+            session.supportsAux = extended && *data == 3;
             if (session.revision == kMaxWireInteger) session.revision = 0;
             writeText(output, map.title);
             if (extended) {
                 *output++ = static_cast<uint8_t>(map.expanderCount);
-
+                if (session.supportsAux) *output++ = 1;
             }
         }
     } else if (lease == 0 || lease != session.lease) status = Status::expired;
@@ -79,9 +81,29 @@ inline std::size_t respond(PatchMap& map, Session& session,
             *output++ = static_cast<uint8_t>(firstSocket + 1);
             *output++ = static_cast<uint8_t>(map.connections[firstSocket].colour);
             *output++ = static_cast<uint8_t>(map.connections[firstSocket].tag);
+            if (session.supportsAux) *output++ = static_cast<uint8_t>(selectedAux);
         }
     }
+    else if (command >= 10 && !session.supportsAux) status = Status::invalid;
     else if (revision != session.revision) status = Status::conflict;
+    else if (command == 10) {
+        if (data != end) status = Status::invalid;
+        else for (int group = 0; group < 7; ++group) {
+            uint8_t bits = 0;
+            for (int bit = 0; bit < 7; ++bit) {
+                const int index = group * 7 + bit;
+                if (index < kAuxCount && map.aux[index].present) bits |= 1 << bit;
+            }
+            *output++ = bits;
+        }
+    } else if (command == 11) {
+        if (end - data != 1 || *data < 1 || *data > kAuxCount || !map.aux[*data - 1].present) status = Status::invalid;
+        else {
+            *output++ = *data;
+            writeText(output, map.aux[*data - 1].description);
+            writeText(output, map.aux[*data - 1].group);
+        }
+    }
     else if (command == 2) {
         if (end - data != 1 || *data >= map.socketCount()) status = Status::invalid;
         else {
@@ -95,6 +117,23 @@ inline std::size_t respond(PatchMap& map, Session& session,
         if (end - data != 1 || *data >= map.expanderCount) status = Status::invalid;
         else { *output++ = static_cast<uint8_t>(map.expanders[*data].type); writeText(output, map.expanders[*data].name); }
     } else if (session.revision == kMaxWireInteger) status = Status::expired;
+    else if (command >= 12) {
+        if (data == end || *data < 1 || *data > kAuxCount) status = Status::invalid;
+        else {
+            auto& row = map.aux[*data++ - 1];
+            AuxRecord candidate;
+            candidate.present = true;
+            if (command == 12) {
+                if (data != end || row.present) status = Status::invalid;
+                else { row = candidate; ++session.revision; }
+            } else if (command == 14) {
+                if (data != end || !row.present) status = Status::invalid;
+                else { row = {}; ++session.revision; }
+            } else if (!row.present || !readText(data, end, candidate.description) ||
+                       !readText(data, end, candidate.group) || data != end) status = Status::invalid;
+            else { row = candidate; ++session.revision; }
+        }
+    }
     else if (command == 3) {
         if (end - data < 5 || data[0] >= map.socketCount() ||
             data[1] >= kColourCount || data[2] > 12) status = Status::invalid;

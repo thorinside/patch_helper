@@ -55,6 +55,16 @@ property changes. Local fields merge with unrelated native edits. Socket focus
 updates use the minimap highlight without stealing keyboard focus. Loading,
 sync, validation and error feedback must never shift the layout.
 
+## AUX development scope
+
+The owner requested Snailed's AUX support with explicitly added rows, Description
+and Group, deletion of removed data, and native viewing with Helper text editing.
+The owner also requires Lua-defined table layout and remembered resizable columns.
+The development companion declares column order, labels, types, sizes and generic
+record sections; Helper renders them and keeps width preferences locally.
+This requires updated plugin, companion and Helper builds. AUX hardware acceptance
+is pending. See the AUX wayfinder map under `.scratch/aux-bus-support/`.
+
 ## Evidence on Hand
 
 Source spec: Substrate d4abe223-d4c5-4784-811b-417aa43586ee, updated as V1.

@@ -157,3 +157,45 @@ choice list; no permanent model dropdown remains. Selecting a model dispatches
 are revalidated on selection; Lua cannot remap the selected model. Cancel,
 Escape and barrier dismissal do not mutate the map. No file-loading buttons or
 success narratives are introduced.
+
+## Declarative columns and record sections
+
+This development extension requires the corresponding updated Helper renderer.
+Lua remains pure. It specifies layout; Flutter renders widgets and the Patch
+Helper adapter validates domain changes and owns MIDI synchronization.
+
+The existing `socket_table` document may declare `table_id` and an ordered
+`columns` list. Each column has stable `key`, `type`, `label`, `width`, optional
+`min_width`, `max_width`, `flex`, and `max_length`. Socket bindings are `socket`
+(label), `destination` (text), `colour` (colour), `tag` (integer), and `group`
+(text). Lua can reorder or omit fields while retaining the socket identity.
+Companions without columns retain the previous layout defaults.
+
+A `record_sections` list declares additional tables. A section names its `id`,
+record `source`, numeric `identity` field, title, minimap `short`, `row_label`,
+`identity_label`, and the `after_socket` group boundary. Its columns use the same
+size schema with label, text, and remove cell types. The section may reference
+an `add_action` choice dialog, and declares `remove_event`, `remove_label`, and
+confirmation title, message, cancel and confirm labels. `{record}` in the title
+expands to the row label. Nonempty record sources must be represented, so an old
+companion cannot silently hide saved AUX data.
+
+Choice-dialog rendering is reusable. Lua provides action IDs, labels and unique
+integer choices 0–127. The algorithm adapter separately authorizes the supported
+actions and values; the renderer cannot grant arbitrary MIDI access. Unknown
+adapter actions remain disabled. The latest document and domain state are
+rechecked after a dialog closes.
+
+For AUX, the adapter exposes `aux` records, each with bus, description and group,
+and `supports_aux`. Lua declares the section, columns, unused-bus choices and
+remove confirmation. It handles add_aux, set_aux and remove_aux actions. The
+adapter enforces bus identities, field limits and acknowledgement behavior.
+`focus_record = {source, id}` follows native record selection without moving text
+focus. Record selection uses a distinct identity from physical socket numbers.
+
+Flutter uses the same resolved widths for headers and cells. Drag handles,
+keyboard arrows and screen-reader increase/decrease actions resize columns
+within Lua's bounds. Helper stores widths locally under companion GUID, table
+ID and column key. Labels and order can change without losing saved widths;
+new bounds clamp older preferences. Widths never enter the NT preset or Lua
+state. Resetting Helper settings clears the stored widths.

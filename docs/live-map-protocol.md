@@ -1,4 +1,4 @@
-# Development live-map protocol (revision 2)
+# Development live-map protocol
 
 The plug-in remains the source of truth. Helper reads a complete map before
 editing, sends one complete connection or title per action, and updates its
@@ -138,3 +138,44 @@ revision exhaustion they invalidate the lease before resetting the revision.
 Selection-only changes do not mutate the map revision. `live-session.json`
 contains read frames interleaved with native parameter callbacks and is exercised
 by the actual C++ factory and the Dart client/Lua companion tests.
+
+## Negotiated AUX extension
+
+The existing prefix and commands 1–9 retain their legacy session layouts.
+Open with payload `03` negotiates AUX support. The successful data is title text,
+expander count, then capability revision `01`. An older plugin returns invalid
+request for `03`; the new client retries Open with `02`. Only an invalid-request
+response triggers fallback. Timeouts, malformed replies and session errors do
+not silently downgrade.
+
+An AUX-capable session appends one byte to command 9's existing response:
+selected AUX number 1–44, or 0 when the native focus is physical. Legacy sessions
+receive the unchanged response. AUX commands are invalid outside a negotiated
+session. All commands below use the same lease and expected revision as the
+physical map; reads cannot assemble records from different revisions.
+
+| Command | Request | Successful response data |
+| --- | --- | --- |
+| 10, AUX inventory | Empty | Seven 7-bit presence masks, least-significant bit first |
+| 11, read AUX | Bus number 1–44 | Bus number, Description text, Group text |
+| 12, add AUX | Bus number 1–44 | Empty |
+| 13, write AUX | Bus number, Description text, Group text | Empty |
+| 14, remove AUX | Bus number 1–44 | Empty |
+
+Inventory bit `bus - 1` identifies the bus. Bits 44–48 must be zero. Text fields
+accept 0–32 printable ASCII characters. Add rejects duplicates and stores a
+present blank record. Write requires an existing record. Remove requires an
+existing record and clears its presence and both strings. Successful mutations
+increment the shared revision once. Reads remain possible at revision exhaustion;
+writes require a fresh lease. Invalid requests never partially modify a record.
+
+Physical socket IDs stay unchanged. Preset data version 3 contains `version`,
+`title`, `expanders`, `connections`, and a sparse `aux` array. Each AUX entry is
+`{bus, description, group}`. Duplicate or out-of-range bus IDs, invalid strings,
+and unknown fields reject the whole preset without replacing the prior map.
+Versions 1 and 2 remain readable. Maps without AUX serialize in their existing
+version 1 or 2 shape. Old plugins cannot read version 3 presets.
+
+`aux-session.json` is shared byte-for-byte with Helper and covers sparse
+identities, edits, watch, deletion, re-add and reload. `legacy-midi-session.json`
+retains the original session transcript as a backward-compatibility check.
