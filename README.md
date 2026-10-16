@@ -5,15 +5,21 @@ is plugged into each socket, then look it up on the NT or edit it in NT Helper.
 Connections are entered manually; Patch Helper does not detect cables or change
 audio, CV, or routing.
 
-**Latest release: 0.5.0.** Tested on disting NT firmware **1.19.0beta**. Other
-firmware versions have not been verified. The companion editor requires
+**Latest release: 0.6.0.** Existing physical-socket workflows have development
+hardware test evidence; the new AUX lifecycle and this packaged build still need
+physical verification. The companion editor requires
 [NT Helper 2.56.0](https://github.com/No-Such-Device/nt_helper/releases/tag/v2.56.0)
 or newer.
 
-The AUX bus editor and resizable columns described below are development
-changes. They require the updated plugin, SD companion, and a compatible NT
-Helper build containing AUX support and declarative table columns. NT Helper
-2.56.0 alone does not provide these additions. No AUX release has been published.
+This release adds AUX bus records and a Lua-defined editor layout. AUX editing
+and resizable columns require the included plugin and SD companion plus an NT
+Helper build containing [PR #157](https://github.com/No-Such-Device/nt_helper/pull/157).
+The earlier NT Helper 2.56.0 and 2.57.0 releases do not include that editor.
+No new NT Helper release is published alongside this package.
+
+**Compatibility:** presets containing AUX records use **version 3** and cannot
+be read by older Patch Helper binaries. Physical AUX save/recall and control
+acceptance remain unverified; automated checks do not establish hardware acceptance.
 
 ## Install
 
@@ -107,7 +113,7 @@ Existing cable-only preset save/recall has been checked on hardware. AUX
 save/recall and physical control acceptance still need device verification.
 The updated plugin reads existing presets, including legacy thirteen-bank maps,
 without moving socket IDs or parameter mappings. AUX presets use a new data
-version and require the updated plugin and Helper; older binaries cannot read
+version (3) and require the updated plugin and Helper; older binaries cannot read
 them. Removing all AUX rows restores the earlier cable-only data format. End-of-chain preset
 merging remains unverified. If the editor fails to load, check the Helper build
 and exact `programs/helper/ThPh.lua` path; it retries automatically after errors.

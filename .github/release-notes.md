@@ -1,32 +1,44 @@
-Patch Helper records physical cable connections with your NT preset.
-This release includes its SD-card Lua companion for NT Helper 2.56.0 or newer.
+Patch Helper v0.6.0 adds selected AUX bus records and a Lua-defined companion editor.
 
-Record physical connections for 12 inputs, 8 outputs, and up to eight expander
-banks. Edit destination, cable colour, tag, and group in Helper. On the NT,
-view every field and edit colour/tag with the pots and encoders.
+- Record any selected **AUX 1–44** bus with Description and Group, saved with the NT preset.
+- Add and remove AUX records through the matching NT Helper editor; view added buses on the native NT display.
+- The SD Lua companion declares table columns and record sections. A matching NT Helper build renders them and remembers resized column widths.
+- Existing physical socket identities, expander records, and parameter mappings remain stable.
 
-Download **patch_helper.zip** and copy its `programs` folder to the
-SD root. It includes both files:
+## Compatibility and verification limits
 
-```text
+**AUX presets use data format version 3. Older Patch Helper binaries cannot read these presets.**
+The updated plugin reads existing cable-only presets, including legacy expander maps.
+Presets without AUX records retain their earlier format; removing all AUX records restores the cable-only format.
+
+**Physical-device AUX save/recall and control acceptance remain unverified.**
+Existing physical-socket workflows have hardware test evidence from development;
+those results do not validate the new AUX lifecycle or this packaged build on
+hardware. Firmware compatibility beyond those recorded tests and end-of-chain
+preset merging remain unverified.
+
+AUX editing and resizable columns require the included updated plugin and SD
+companion plus an NT Helper build containing
+[NT Helper PR #157](https://github.com/No-Such-Device/nt_helper/pull/157).
+The published NT Helper 2.56.0 and 2.57.0 releases do not include that editor.
+**No NT Helper release is published as part of this release.**
+
+## Installation
+
+Download **patch_helper.zip** and copy its `programs` folder to the NT SD root,
+preserving both paths:
+
+```
 programs/plug-ins/patch_helper.o
 programs/helper/ThPh.lua
 ```
 
-The companion requires
-[NT Helper 2.56.0](https://github.com/No-Such-Device/nt_helper/releases/tag/v2.56.0)
-or newer. Helper can install both files from this ZIP through its Gallery.
+Restart the NT after copying. Wait for the companion editor to finish syncing,
+then save the NT preset to retain changes. The companion Lua file is not a Lua
+algorithm to add to a preset.
 
-Hardware testing during development used firmware **1.19.0beta** and covered
-loading, native display, two-way edits, dynamic pages, and regular preset recall.
-Other firmware and end-of-chain preset merging remain unverified. Text is
-read-only on the NT. Wait for sync before leaving Helper's editor, then save the
-NT preset to retain changes.
-
-The owner verified Gallery download and installation of both companion files.
-
-The release ZIP is built by CI after native sanitizer tests, static analysis,
-ARM object inspection, and emulated startup checks. Those checks do not replace
-testing this packaged build on your device.
+The CI release ZIP is built only after native ASan/UBSan tests, static analysis,
+ARM object inspection, and strict-alignment emulated startup checks pass. These
+checks do not replace a physical-device test.
 
 [Installation and controls](https://github.com/thorinside/patch_helper#readme)
