@@ -22,7 +22,7 @@ Plan and implement AUX bus records in the existing Patch Helper plugin and compa
 
 ## Decisions so far
 
-No decision tickets resolved during charting. The destination and intake choices are recorded above.
+- [Define what an AUX row records](issues/01-aux-record-meaning.md): AUX 1 through AUX 44 document bus purpose using Description and Group.
 
 ## Not yet specified
 
