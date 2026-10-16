@@ -137,7 +137,7 @@ void testProtocolBounds() {
 int32_t NT_algorithmIndex(const _NT_algorithm*) { return 0; }
 void NT_updateParameterDefinition(uint32_t, uint32_t) {}
 void NT_updateParameterPages(uint32_t) {}
-std::array<bool, 231> grayed{};
+std::array<bool, 234> grayed{};
 void NT_setParameterGrayedOut(uint32_t index, uint32_t p, bool gray) {
     assert(index == 0 && p >= 7 && p < 7 + grayed.size());
     grayed[p - 7] = gray;
@@ -145,7 +145,7 @@ void NT_setParameterGrayedOut(uint32_t index, uint32_t p, bool gray) {
 
 uint32_t NT_parameterOffset() { return 7; }
 void NT_setParameterFromAudio(uint32_t index, uint32_t p, int16_t value) {
-    assert(index == 0 && p >= 7 && p < 7 + 231);
+    assert(index == 0 && p >= 7 && p < 7 + 234);
     const_cast<int16_t*>(activeAlgorithm->v)[p - 7] = value;
     const auto* f = reinterpret_cast<const _NT_factory*>(pluginEntry(kNT_selector_factoryInfo, 0));
     f->parameterChanged(activeAlgorithm, p - 7);
@@ -196,8 +196,59 @@ void testEditableTextLimits() {
     assert(map.expanderCount == 1 && std::strlen(map.expanders[0].name) == 32);
 }
 
+void testAuxStorageAndProtocol() {
+    using namespace patch_helper;
+    PatchMap map, scratch;
+    map.expanderCount = kMaxExpanders;
+    copyText(map.connections[123].destination, "Legacy output");
+    Session session{43, 0, true};
+    uint8_t reply[128]{};
+    auto send = [&](int command, std::initializer_list<uint8_t> payload) {
+        std::vector<uint8_t> request(20, 0);
+        std::copy(std::begin(kPrefix), std::end(kPrefix), request.begin());
+        request[6] = command; request[12] = 43;
+        writeInteger(request.data() + 16, session.revision);
+        request.insert(request.end(), payload);
+        respond(map, session, request.data(), request.size(), reply);
+        return reply[20];
+    };
+    for (int bus = 1; bus <= kAuxCount; ++bus) assert(send(12, {static_cast<uint8_t>(bus)}) == 0);
+    assert(map.auxCount() == 44 && map.socketCount() == 124);
+    assert(send(12, {44}) == 1 && session.revision == 44);
+    assert(send(13, {44, 4, 'E', 'c', 'h', 'o', 2, 'F', 'X'}) == 0);
+    assert(send(11, {44}) == 0 && reply[21] == 44 && reply[22] == 4);
+    assert(send(10, {}) == 0 && reply[21] == 127 && reply[27] == 3);
+    assert(send(14, {44}) == 0 && !map.aux[43].present);
+    assert(send(12, {44}) == 0 && !map.aux[43].description[0] && !map.aux[43].group[0]);
+    assert(send(12, {0}) == 1 && send(13, {45, 0, 0}) == 1);
+    const auto revision = session.revision;
+    assert(send(13, {44, 2, 'x'}) == 1 && session.revision == revision);
+    JsonWriter writer; writeMap(map, writer);
+    const auto saved = writer.value;
+    assert(saved["patch_helper"]["version"] == 3 && saved["patch_helper"]["aux"].size() == 44);
+    JsonReader reader(saved);
+    PatchMap loaded;
+    assert(readMap(loaded, reader, scratch) && loaded.auxCount() == 44);
+    assert(std::string(loaded.connections[123].destination) == "Legacy output");
+    for (int kind = 0; kind < 5; ++kind) {
+        auto broken = saved;
+        auto& rows = broken["patch_helper"]["aux"];
+        if (kind == 0) rows[0]["bus"] = 0;
+        if (kind == 1) rows[0]["bus"] = 45;
+        if (kind == 2) rows[1]["bus"] = 1;
+        if (kind == 3) rows[0]["description"] = std::string(33, 'x');
+        if (kind == 4) rows[0]["group"] = "bad\ntext";
+        JsonReader bad(broken);
+        assert(!readMap(loaded, bad, scratch));
+        JsonWriter after; writeMap(loaded, after); assert(after.value == saved);
+    }
+    session.supportsAux = false;
+    assert(send(14, {1}) == 1 && map.auxCount() == 44);
+}
+
 int main(int argc, char** argv) {
     testProtocolBounds();
+    testAuxStorageAndProtocol();
     testEditableTextLimits();
     assert(argc == 2);
     std::ifstream input(argv[1]);
@@ -209,7 +260,7 @@ int main(int argc, char** argv) {
     assert(pluginEntry(kNT_selector_numFactories, 0) == 1);
     _NT_algorithmRequirements req{};
     factory->calculateRequirements(req, nullptr);
-    assert(req.numParameters == 231 && req.dtc == 0 && req.dram == 0 && req.itc == 0);
+    assert(req.numParameters == 234 && req.dtc == 0 && req.dram == 0 && req.itc == 0);
     std::vector<std::max_align_t> memory((req.sram + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t));
     _NT_algorithmMemoryPtrs ptrs{reinterpret_cast<uint8_t*>(memory.data()), nullptr, nullptr, nullptr};
     auto* algorithm = factory->construct(ptrs, req, nullptr);
@@ -225,7 +276,7 @@ int main(int argc, char** argv) {
         assert(midiReply.size() > 20 && midiReply[20] == 0);
         assert(midiWireReply.front() == 0xf0 && midiWireReply.back() == 0xf7);
     }
-    int16_t values[231] = {1, 0, 0};
+    int16_t values[234] = {1, 0, 0};
     auto& page = values[0];
     algorithm->v = values;
     const auto load = [&](const Json& json) {
@@ -236,6 +287,13 @@ int main(int argc, char** argv) {
         JsonWriter writer; _NT_jsonStream stream(&writer);
         factory->serialise(algorithm, stream); return writer.value;
     };
+    std::ifstream legacyWireInput("tests/fixtures/legacy-midi-session.json");
+    for (const auto& frame : Json::parse(legacyWireInput)) {
+        const auto bytes = frame["request"].get<std::vector<uint8_t>>();
+        factory->midiSysEx(bytes.data(), bytes.size());
+        assert(frame["response"].get<std::vector<uint8_t>>() == midiWireReply);
+    }
+    assert(load(Json::object()));
     std::ifstream wireInput("tests/fixtures/midi-session.json");
     const auto frames = Json::parse(wireInput);
     for (const auto& frame : frames) {
@@ -256,6 +314,14 @@ int main(int argc, char** argv) {
     assert(load(persistedExpanded) && save() == persistedExpanded);
     assert(persistedExpanded["patch_helper"]["expanders"][1]["name"] == "Pitch");
     assert(persistedExpanded["patch_helper"]["connections"][28]["destination"] == "Plaits V/oct");
+    assert(load(Json::object()));
+    std::ifstream auxWireInput("tests/fixtures/aux-session.json");
+    for (const auto& frame : Json::parse(auxWireInput)) {
+        const auto bytes = frame["request"].get<std::vector<uint8_t>>();
+        factory->midiSysEx(bytes.data(), bytes.size());
+        assert(frame["response"].get<std::vector<uint8_t>>() == midiWireReply);
+    }
+    assert(save()["patch_helper"]["aux"].size() == 2);
     assert(load(Json::object()));
     // The exact host watch transcript includes real on-device parameter callbacks.
     assert(load(Json::object()));
@@ -614,5 +680,41 @@ int main(int argc, char** argv) {
     assert(patch_helper::copyText(connection.destination, ""));
     assert(!connection.connected() && connection.colour == 4 && connection.tag == 12);
     assert(load(Json::object())); assert(save() == defaults);
+    // Native AUX page appends three definitions and leaves all physical indices intact.
+    auto auxPreset = defaults;
+    auxPreset["patch_helper"]["version"] = 3;
+    auxPreset["patch_helper"]["expanders"] = Json::array();
+    auxPreset["patch_helper"]["aux"] = Json::array({
+        {{"bus", 3}, {"description", ""}, {"group", ""}},
+        {{"bus", 44}, {"description", "Effect return"}, {"group", "FX"}}
+    });
+    assert(load(auxPreset)); factory->step(algorithm, nullptr, 0);
+    assert(algorithm->parameterPages->numPages == 21);
+    assert(std::string(algorithm->parameterPages->pages[20].name) == "AUX buses");
+    assert(algorithm->parameterPages->pages[20].params[0] == 231);
+    values[231] = 2; factory->parameterChanged(algorithm, 231);
+    assert(format(231, 2) == "AUX 44" && format(232, 0) == "Effect return" && format(233, 0) == "FX");
+    assert(!grayed[231] && grayed[232] && grayed[233]);
+    assert(header()[0] == "AUX 44" && header()[2] == "Read only");
+    auto auxSaved = save();
+    sendUi(0, 127, kNT_potR, 0, 0, 1); assert(save() == auxSaved);
+    sendUi(-1, 0); assert(header()[0] == "AUX 3");
+    assert(save() == auxSaved); // Even a blank added AUX row is selectable.
+    values[231] = 2; factory->parameterChanged(algorithm, 231);
+    request.assign(21, 0);
+    std::copy(std::begin(patch_helper::kPrefix), std::end(patch_helper::kPrefix), request.begin());
+    request[6] = 1; request[12] = 80; request[20] = 3;
+    factory->midiSysEx(request.data(), request.size()); assert(midiReply[20] == 0);
+    request[6] = 12; request[20] = 1;
+    factory->midiSysEx(request.data(), request.size()); assert(midiReply[20] == 0);
+    factory->step(algorithm, nullptr, 0);
+    assert(format(231, values[231]) == "AUX 44" && header()[0] == "AUX 44");
+    factory->midiSysEx(request.data(), request.size()); assert(midiReply[20] == 3);
+    request[6] = 14; request[16] = 1;
+    factory->midiSysEx(request.data(), request.size()); assert(midiReply[20] == 0);
+    factory->step(algorithm, nullptr, 0);
+    assert(format(231, values[231]) == "AUX 44" && header()[0] == "AUX 44");
+    assert(load(defaults)); factory->step(algorithm, nullptr, 0);
+    assert(algorithm->parameterPages->numPages == 20);
     std::cout << "PASS: preset round trip, validation/atomicity, socket identity, display bounds, untouched buses\n";
 }

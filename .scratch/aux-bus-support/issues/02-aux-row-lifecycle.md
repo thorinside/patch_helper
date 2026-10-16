@@ -3,8 +3,8 @@
 Parent: ../map.md
 Label: wayfinder:grilling
 Type: grilling
-Status: open
-Assignee: none
+Status: resolved
+Assignee: Codex
 Blocked by: none
 
 ## Question
@@ -21,3 +21,7 @@ Owner answers received on 2026-10-15:
 - AUX rows are viewable and selectable on the NT. Text editing remains in Helper.
 
 These are direct human choices, preserved here for the next ticket session. This ticket remains open under wayfinder's one-resolution-per-session rule. Its remaining details are empty-row behavior and saved visibility; propose retaining an explicitly added empty row until removal and saving the added-bus inventory with the preset.
+
+## Answer
+
+The owner chose deletion of the row and its information, and native NT viewing and selection with text editing in Helper. The owner also approved saving explicitly added blank rows with the preset until removal. Confirm deletion for a row containing either Description or Group; remove blank rows directly. Re-adding a removed bus starts empty.

@@ -20,7 +20,10 @@ constexpr int kExpanderText = kNativeText + 2 * patch_helper::kSocketCount;
 constexpr int kBank = kExpanderText + 16;
 constexpr int kBankName = kBank + 1;
 constexpr int kLegacyText = kBankName + 1;
-constexpr int kParameterCount = kLegacyText + 2;
+constexpr int kAuxSelect = kLegacyText + 2;
+constexpr int kAuxDescription = kAuxSelect + 1;
+constexpr int kAuxGroup = kAuxDescription + 1;
+constexpr int kParameterCount = kAuxGroup + 1;
 constexpr int kBankPage = patch_helper::kSocketCount;
 constexpr int kExpanderPages = kBankPage + 1;
 constexpr int kCompatibilityPage = kExpanderPages + 8;
@@ -32,7 +35,7 @@ struct Algorithm : _NT_algorithm {
     std::array<_NT_parameter, kParameterCount> definitions{};
     std::array<std::array<uint8_t, 4>, patch_helper::kSocketCount + 8> pageIndices{};
     std::array<std::array<char, 16>, patch_helper::kSocketCount + 8> pageNames{};
-    std::array<_NT_parameterPage, kCompatibilityPage + 1> pages{};
+    std::array<_NT_parameterPage, kCompatibilityPage + 2> pages{};
     _NT_parameterPages pageList{};
     bool projecting = false;
     bool needsProjection = true;
@@ -45,6 +48,9 @@ struct Algorithm : _NT_algorithm {
     bool uiValuePickup = true;
     int configuredBank = -1;
     int configuredExpanders = -1;
+    int configuredAux = -1;
+    bool focusAux = false;
+    int requestedAuxOrdinal = 0;
 };
 constexpr _NT_parameter parameters[] = {
     {"First socket", 1, 20, 1, kNT_unitNone, 0, nullptr},
@@ -100,6 +106,9 @@ _NT_algorithm* construct(const _NT_algorithmMemoryPtrs& ptrs,
     algorithm->pages[kBankPage] = {"Expander bank", 2, 0, {0, 0}, bankIndices};
     static constexpr uint8_t legacyIndices[] = {0, kLegacyText, 1, 2, kLegacyText + 1};
     algorithm->pages[kCompatibilityPage] = {"Other sockets", 5, 0, {0, 0}, legacyIndices};
+    algorithm->definitions[kAuxSelect] = {"AUX bus", 1, 1, 1, kNT_unitHasStrings, 0, nullptr};
+    algorithm->definitions[kAuxDescription] = {"Description", 0, 0, 0, kNT_unitHasStrings, 0, nullptr};
+    algorithm->definitions[kAuxGroup] = {"Group", 0, 0, 0, kNT_unitHasStrings, 0, nullptr};
     algorithm->pageList = {patch_helper::kSocketCount, algorithm->pages.data()};
     algorithm->parameterPages = &algorithm->pageList;
     return algorithm;
@@ -113,6 +122,17 @@ int selectedBank(const Algorithm& algorithm) {
         std::max(0, std::min(algorithm.map.expanderCount, patch_helper::kNativeExpanders) - 1));
 }
 
+int selectedAux(const Algorithm& a) {
+    return a.map.auxIndex(std::clamp(a.requestedAuxOrdinal ? a.requestedAuxOrdinal - 1 : a.v ? int(a.v[kAuxSelect]) - 1 : 0, 0, std::max(0, a.map.auxCount() - 1)));
+}
+int uiCount(const Algorithm& a) { return a.map.socketCount() + a.map.auxCount(); }
+int uiAux(const Algorithm& a, int slot) { return slot < a.map.socketCount() ? -1 : a.map.auxIndex(slot - a.map.socketCount()); }
+void uiName(char* text, const Algorithm& a, int slot) {
+    const int aux = uiAux(a, slot);
+    if (aux < 0) socketName(text, slot);
+    else { std::strcpy(text, "AUX "); NT_intToString(text + 4, aux + 1); }
+}
+
 // Project the selected record into native controls without treating these
 // host setter callbacks as new edits. Persistent cable data remains authoritative.
 void projectControls(Algorithm& algorithm) {
@@ -120,6 +140,9 @@ void projectControls(Algorithm& algorithm) {
     algorithm.projecting = true;
     const auto index = NT_algorithmIndex(&algorithm);
     const auto offset = NT_parameterOffset();
+    const int auxOrdinal = std::clamp(algorithm.requestedAuxOrdinal ? algorithm.requestedAuxOrdinal : int(algorithm.v[kAuxSelect]), 1, std::max(1, algorithm.map.auxCount()));
+    if (algorithm.v[kAuxSelect] != auxOrdinal) NT_setParameterFromAudio(index, offset + kAuxSelect, auxOrdinal);
+    algorithm.requestedAuxOrdinal = 0;
     const int socket = selectedSocket(algorithm);
     const auto& row = algorithm.map.connections[socket];
     const int values[] = {socket + 1, row.colour, row.tag};
@@ -135,7 +158,7 @@ void projectControls(Algorithm& algorithm) {
     const int bank = selectedBank(algorithm) + 1;
     if (algorithm.v[kBank] != bank) NT_setParameterFromAudio(index, offset + kBank, bank);
     for (int p = kNativeText; p < kParameterCount; ++p) {
-        if (p == kBank) continue;
+        if (p == kBank || p == kAuxSelect) continue;
         if (algorithm.v[p] != 0) NT_setParameterFromAudio(index, offset + p, 0);
         if (algorithm.needsGray) NT_setParameterGrayedOut(index, offset + p, true);
     }
@@ -147,6 +170,14 @@ void projectControls(Algorithm& algorithm) {
 void parameterChanged(_NT_algorithm* self, int p) {
     auto& algorithm = *static_cast<Algorithm*>(self);
     if (algorithm.projecting || !self->v || p < 0 || p >= kParameterCount) return;
+    if (p == kAuxSelect) {
+        algorithm.requestedAuxOrdinal = 0;
+        algorithm.focusAux = algorithm.map.auxCount() > 0;
+        if (algorithm.focusAux) algorithm.uiSocket = algorithm.map.socketCount() + std::clamp(int(self->v[p]) - 1, 0, algorithm.map.auxCount() - 1);
+        projectControls(algorithm);
+        return;
+    }
+    if (p < kNumericParameters || p == kBank) algorithm.focusAux = false;
     if (p == kBank) {
         if (algorithm.map.expanderCount) {
             algorithm.projecting = true;
@@ -202,8 +233,15 @@ void step(_NT_algorithm* self, float*, int) {
         NT_updateParameterDefinition(NT_algorithmIndex(self), kBank);
         algorithm.needsProjection = true;
     }
+    const int auxMax = std::max(1, algorithm.map.auxCount());
+    if (algorithm.definitions[kAuxSelect].max != auxMax) {
+        algorithm.definitions[kAuxSelect].max = auxMax;
+        NT_updateParameterDefinition(NT_algorithmIndex(self), kAuxSelect);
+        algorithm.needsProjection = true;
+    }
+    if (!algorithm.map.auxCount()) algorithm.focusAux = false;
     const int bank = selectedBank(algorithm);
-    if (algorithm.configuredBank != bank || algorithm.configuredExpanders != algorithm.map.expanderCount) {
+    if (algorithm.configuredBank != bank || algorithm.configuredExpanders != algorithm.map.expanderCount || algorithm.configuredAux != algorithm.map.auxCount()) {
         // Only one bank's eight text pages are visible at a time. Every bank's
         // colour/tag parameters retain their own stable indices and mappings.
         for (int row = 0; row < 8; ++row) {
@@ -217,8 +255,17 @@ void step(_NT_algorithm* self, float*, int) {
             algorithm.pages[kExpanderPages + row] = {algorithm.pageNames[storage].data(), 4, 1,
                 {0, 0}, algorithm.pageIndices[storage].data()};
         }
+        static constexpr uint8_t bankIndices[] = {kBank, kBankName};
+        static constexpr uint8_t legacyIndices[] = {0, kLegacyText, 1, 2, kLegacyText + 1};
+        algorithm.pages[kBankPage] = {"Expander bank", 2, 0, {0, 0}, bankIndices};
+        algorithm.pages[kCompatibilityPage] = {"Other sockets", 5, 0, {0, 0}, legacyIndices};
         algorithm.pageList.numPages = algorithm.map.expanderCount == 0 ? patch_helper::kSocketCount
             : kCompatibilityPage + (algorithm.map.expanderCount > patch_helper::kNativeExpanders ? 1 : 0);
+        if (algorithm.map.auxCount()) {
+            static constexpr uint8_t auxIndices[] = {kAuxSelect, kAuxDescription, kAuxGroup};
+            algorithm.pages[algorithm.pageList.numPages++] = {"AUX buses", 3, 0, {0, 0}, auxIndices};
+        }
+        algorithm.configuredAux = algorithm.map.auxCount();
         algorithm.configuredBank = bank;
         algorithm.configuredExpanders = algorithm.map.expanderCount;
         NT_updateParameterPages(NT_algorithmIndex(self));
@@ -230,12 +277,12 @@ void step(_NT_algorithm* self, float*, int) {
 // Connected rows provide context; an unused selection gets a temporary bottom
 // row. Selection always remains visible, including after edits or inventory changes.
 std::array<int, 4> visibleSockets(Algorithm& a) {
-    std::array<int, patch_helper::kMaxSockets> connected{};
+    std::array<int, patch_helper::kMaxSockets + patch_helper::kAuxCount> connected{};
     std::array<int, 4> visible{-1, -1, -1, -1};
-    a.uiSocket = std::clamp(a.uiSocket, 0, a.map.socketCount() - 1);
+    a.uiSocket = std::clamp(a.uiSocket, 0, uiCount(a) - 1);
     int count = 0, selected = -1, before = 0, first = 0;
-    for (int socket = 0; socket < a.map.socketCount(); ++socket) {
-        if (!a.map.connections[socket].connected()) continue;
+    for (int socket = 0; socket < uiCount(a); ++socket) {
+        if (uiAux(a, socket) < 0 && !a.map.connections[socket].connected()) continue;
         if (socket < a.firstVisibleSocket) ++first;
         if (socket < a.uiSocket) ++before;
         if (socket == a.uiSocket) selected = count;
@@ -255,6 +302,7 @@ std::array<int, 4> visibleSockets(Algorithm& a) {
     return visible;
 }
 int uiValue(const Algorithm& algorithm) {
+    if (uiAux(algorithm, algorithm.uiSocket) >= 0) return 0;
     const auto& row = algorithm.map.connections[std::clamp(algorithm.uiSocket, 0, algorithm.map.socketCount() - 1)];
     return algorithm.uiField ? row.tag : row.colour;
 }
@@ -264,8 +312,8 @@ uint32_t hasCustomUi(_NT_algorithm*) {
 }
 void setupUi(_NT_algorithm* self, _NT_float3& pots) {
     auto& a = *static_cast<Algorithm*>(self);
-    a.uiSocket = std::clamp(a.uiSocket, 0, a.map.socketCount() - 1);
-    pots[0] = float(a.uiSocket) / (a.map.socketCount() - 1);
+    a.uiSocket = std::clamp(a.uiSocket, 0, uiCount(a) - 1);
+    pots[0] = float(a.uiSocket) / (uiCount(a) - 1);
     pots[1] = float(a.uiField);
     pots[2] = float(uiValue(a)) / uiMaximum(a);
     a.uiLastValuePot = pots[2];
@@ -279,10 +327,10 @@ void customUi(_NT_algorithm* self, const _NT_uiData& data) {
     auto& a = *static_cast<Algorithm*>(self);
     const int previousSocket = a.uiSocket;
     const int previousField = a.uiField;
-    a.uiSocket = std::clamp(a.uiSocket, 0, a.map.socketCount() - 1);
+    a.uiSocket = std::clamp(a.uiSocket, 0, uiCount(a) - 1);
     if ((data.controls & kNT_potL) && std::isfinite(data.pots[0]))
-        a.uiSocket = potIndex(data.pots[0], a.map.socketCount() - 1);
-    a.uiSocket = std::clamp(a.uiSocket + data.encoders[0], 0, a.map.socketCount() - 1);
+        a.uiSocket = potIndex(data.pots[0], uiCount(a) - 1);
+    a.uiSocket = std::clamp(a.uiSocket + data.encoders[0], 0, uiCount(a) - 1);
     if ((data.controls & kNT_potC) && std::isfinite(data.pots[1])) a.uiField = potIndex(data.pots[1], 1);
     const bool selectionChanged = a.uiSocket != previousSocket || a.uiField != previousField;
     int value = uiValue(a);
@@ -303,6 +351,13 @@ void customUi(_NT_algorithm* self, const _NT_uiData& data) {
         a.uiValuePickup = true;
     }
     a.uiKnownValue = value;
+    const int aux = uiAux(a, a.uiSocket);
+    if (selectionChanged && self->v) {
+        a.focusAux = aux >= 0;
+        if (aux >= 0) NT_setParameterFromUi(NT_algorithmIndex(self), NT_parameterOffset() + kAuxSelect,
+            a.uiSocket - a.map.socketCount() + 1);
+    }
+    if (aux >= 0) return;
     if (!self->v || value == uiValue(a)) return;
     const auto index = NT_algorithmIndex(self);
     const auto offset = NT_parameterOffset();
@@ -322,9 +377,10 @@ void preview(char (&buffer)[N], const char* text) {
 }
 bool draw(_NT_algorithm* self) {
     auto& algorithm = *static_cast<Algorithm*>(self);
-    algorithm.uiSocket = std::clamp(algorithm.uiSocket, 0, algorithm.map.socketCount() - 1);
+    algorithm.uiSocket = std::clamp(algorithm.uiSocket, 0, uiCount(algorithm) - 1);
     char channel[16]{};
-    socketName(channel, algorithm.uiSocket);
+    uiName(channel, algorithm, algorithm.uiSocket);
+    const int selectedAuxIndex = uiAux(algorithm, algorithm.uiSocket);
     char value[16]{};
     if (algorithm.uiField) {
         if (uiValue(algorithm)) NT_intToString(value, uiValue(algorithm));
@@ -335,15 +391,17 @@ bool draw(_NT_algorithm* self) {
     NT_drawShapeI(kNT_rectangle, 60, 0, 128, 9, 1);
     NT_drawShapeI(kNT_rectangle, 138, 0, 255, 9, 2);
     NT_drawText(0, 8, channel, 15, kNT_textLeft, kNT_textNormal);
-    NT_drawText(60, 8, algorithm.uiField ? "Tag" : "Cable colour", 15, kNT_textLeft, kNT_textNormal);
-    NT_drawText(138, 8, value, 15, kNT_textLeft, kNT_textNormal);
+    NT_drawText(60, 8, selectedAuxIndex >= 0 ? "AUX bus" : algorithm.uiField ? "Tag" : "Cable colour", 15, kNT_textLeft, kNT_textNormal);
+    NT_drawText(138, 8, selectedAuxIndex >= 0 ? "Read only" : value, 15, kNT_textLeft, kNT_textNormal);
     const auto visible = visibleSockets(algorithm);
     for (int row = 0; row < 4; ++row) {
         const int socket = visible[row];
         if (socket < 0) continue;
-        const auto& connection = algorithm.map.connections[socket];
+        const int aux = uiAux(algorithm, socket);
+        const auto& connection = algorithm.map.connections[aux >= 0 ? 0 : socket];
         char label[16]{};
-        if (socket >= 20) {
+        if (aux >= 0) { std::strcpy(label, "AUX "); NT_intToString(label + 4, aux + 1); }
+        else if (socket >= 20) {
             std::strcpy(label, "E"); NT_intToString(label + 1, (socket - 20) / 8 + 1);
             std::strcat(label, ":"); NT_intToString(label + std::strlen(label), (socket - 20) % 8 + 1);
         } else {
@@ -357,13 +415,13 @@ bool draw(_NT_algorithm* self) {
         // in the native text properties and persistent map.
         char destination[28]{};
         char group[16]{};
-        preview(destination, connection.destination);
-        preview(group, connection.group);
+        preview(destination, aux >= 0 ? algorithm.map.aux[aux].description : connection.destination);
+        preview(group, aux >= 0 ? algorithm.map.aux[aux].group : connection.group);
         NT_drawText(32, y, destination, 15, kNT_textLeft, kNT_textTiny);
-        NT_drawText(144, y, patch_helper::kColours[connection.colour], 15, kNT_textLeft, kNT_textTiny);
+        NT_drawText(144, y, aux >= 0 ? "" : patch_helper::kColours[connection.colour], 15, kNT_textLeft, kNT_textTiny);
         char tag[4] = "-";
         if (connection.tag) NT_intToString(tag, connection.tag);
-        NT_drawText(188, y, tag, 15, kNT_textRight, kNT_textTiny);
+        NT_drawText(188, y, aux >= 0 ? "" : tag, 15, kNT_textRight, kNT_textTiny);
         NT_drawText(196, y, group, 12, kNT_textLeft, kNT_textTiny);
     }
     return true; // The SDK cannot select native UI focus; render the matching control row.
@@ -374,6 +432,7 @@ int textSocket(const Algorithm& algorithm, int p) {
     return (p - kNativeText) / 2;
 }
 int parameterUiPrefix(_NT_algorithm* self, int p, char* text) {
+    if (p >= kAuxSelect) return 0;
     if (p < kLegacyParameters || p >= kParameterCount || p == kBank || p == kBankName) return 0;
     const auto& algorithm = *static_cast<Algorithm*>(self);
     socketName(text, p < kNumericParameters ? (p - kLegacyParameters) / 2 : textSocket(algorithm, p));
@@ -381,7 +440,15 @@ int parameterUiPrefix(_NT_algorithm* self, int p, char* text) {
     return static_cast<int>(std::strlen(text));
 }
 // Fixed-value, greyed-out properties return the complete descriptive text.
-int parameterString(_NT_algorithm* self, int p, int, char* text) {
+int parameterString(_NT_algorithm* self, int p, int valueIndex, char* text) {
+    if (p >= kAuxSelect && p < kParameterCount) {
+        const auto& a = *static_cast<Algorithm*>(self);
+        const int aux = p == kAuxSelect ? (valueIndex < 1 || valueIndex > a.map.auxCount() ? -1 : a.map.auxIndex(valueIndex - 1)) : selectedAux(a);
+        if (aux < 0) std::strcpy(text, "-");
+        else if (p == kAuxSelect) { std::strcpy(text, "AUX "); NT_intToString(text + 4, aux + 1); }
+        else std::strcpy(text, p == kAuxDescription ? a.map.aux[aux].description : a.map.aux[aux].group);
+        return static_cast<int>(std::strlen(text));
+    }
     if (p < kNativeText || p >= kParameterCount || p == kBank) return 0;
     const auto& algorithm = *static_cast<Algorithm*>(self);
     const char* value = "";
@@ -405,6 +472,8 @@ bool deserialise(_NT_algorithm* self, _NT_jsonParse& parse) {
     auto& algorithm = *static_cast<Algorithm*>(self);
     if (!patch_helper::readMap(algorithm.map, parse, algorithm.scratch)) return false;
     algorithm.session = {};
+    algorithm.focusAux = false;
+    algorithm.requestedAuxOrdinal = 0;
     algorithm.needsProjection = true;
     algorithm.needsGray = true;
     return true;
@@ -423,8 +492,21 @@ void midiSysEx(const uint8_t* data, uint32_t size) {
         uint8_t payload[128]{};
     } reply;
     static_assert(offsetof(Reply, payload) == 1);
-    const auto length = patch_helper::respond(algorithm->map, algorithm->session, data, size, reply.payload, selectedSocket(*algorithm));
-    if (reply.payload[20] == 0 && (data[6] == 3 || data[6] == 8)) algorithm->needsProjection = true;
+    const int priorAux = selectedAux(*algorithm);
+    const int priorUiAux = uiAux(*algorithm, algorithm->uiSocket);
+    const auto length = patch_helper::respond(algorithm->map, algorithm->session, data, size, reply.payload, selectedSocket(*algorithm), algorithm->focusAux ? selectedAux(*algorithm) + 1 : 0);
+    if (reply.payload[20] == 0 && (data[6] == 12 || data[6] == 14)) {
+        const auto ordinal = [&](int bus) {
+            return static_cast<int>(std::count_if(algorithm->map.aux.begin(), algorithm->map.aux.begin() + bus,
+                [](const patch_helper::AuxRecord& row) { return row.present; }));
+        };
+        if (priorAux >= 0 && algorithm->map.aux[priorAux].present && algorithm->v) {
+            algorithm->requestedAuxOrdinal = ordinal(priorAux) + 1;
+        }
+        if (priorUiAux >= 0 && algorithm->map.aux[priorUiAux].present)
+            algorithm->uiSocket = algorithm->map.socketCount() + ordinal(priorUiAux);
+    }
+    if (reply.payload[20] == 0 && (data[6] == 3 || data[6] == 8 || data[6] >= 12)) algorithm->needsProjection = true;
     // The host appends F7 when end=true; it does not supply the opening F0.
     NT_sendMidiSysEx(kNT_destinationUSB, reinterpret_cast<const uint8_t*>(&reply), static_cast<uint32_t>(length + 1), true);
 }

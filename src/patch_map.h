@@ -8,6 +8,7 @@
 namespace patch_helper {
 constexpr int kVersion = 1;
 constexpr int kSocketCount = 20;
+constexpr int kAuxCount = 44;
 // One MIDI data byte addresses a socket. Whole eight-output banks fit through 123.
 constexpr int kMaxExpanders = (128 - kSocketCount) / 8;
 // The connected v1.19 beta accepts at most 240 plug-in parameters.
@@ -53,11 +54,25 @@ struct Expander {
     char name[kGroupBytes]{};
 };
 
+struct AuxRecord {
+    bool present = false;
+    char description[kGroupBytes]{};
+    char group[kGroupBytes]{};
+};
+
 struct PatchMap {
     char title[kTextBytes] = "Patch Helper";
     int expanderCount = 0;
     std::array<Expander, kMaxExpanders> expanders{};
     std::array<Connection, kMaxSockets> connections{};
+    std::array<AuxRecord, kAuxCount> aux{};
+    int auxCount() const {
+        return static_cast<int>(std::count_if(aux.begin(), aux.end(), [](const AuxRecord& row) { return row.present; }));
+    }
+    int auxIndex(int ordinal) const {
+        const auto found = std::find_if(aux.begin(), aux.end(), [&ordinal](const AuxRecord& row) { return row.present && ordinal-- == 0; });
+        return found == aux.end() ? -1 : static_cast<int>(found - aux.begin());
+    }
     int socketCount() const { return kSocketCount + 8 * expanderCount; }
 };
 
@@ -67,13 +82,24 @@ template <typename Stream>
 void writeMap(const PatchMap& map, Stream& stream) {
     stream.addMemberName("patch_helper");
     stream.openObject();
-    stream.addMemberName("version"); stream.addNumber(map.expanderCount ? 2 : kVersion);
-    if (map.expanderCount) {
+    stream.addMemberName("version"); stream.addNumber(map.auxCount() ? 3 : map.expanderCount ? 2 : kVersion);
+    if (map.expanderCount || map.auxCount()) {
         stream.addMemberName("expanders"); stream.openArray();
         for (int i = 0; i < map.expanderCount; ++i) {
             stream.openObject();
             stream.addMemberName("type"); stream.addNumber(map.expanders[i].type);
             stream.addMemberName("name"); stream.addString(map.expanders[i].name);
+            stream.closeObject();
+        }
+        stream.closeArray();
+    }
+    if (map.auxCount()) {
+        stream.addMemberName("aux"); stream.openArray();
+        for (int i = 0; i < kAuxCount; ++i) if (map.aux[i].present) {
+            stream.openObject();
+            stream.addMemberName("bus"); stream.addNumber(i + 1);
+            stream.addMemberName("description"); stream.addString(map.aux[i].description);
+            stream.addMemberName("group"); stream.addString(map.aux[i].group);
             stream.closeObject();
         }
         stream.closeArray();
@@ -127,7 +153,7 @@ bool readConnection(Parse& parse, Connection& connection, int& socket) {
 template <typename Parse>
 bool readMapBody(Parse& parse, PatchMap& candidate) {
     int count = 0;
-    if (!parse.numberOfObjectMembers(count) || (count != 3 && count != 4)) return false;
+    if (!parse.numberOfObjectMembers(count) || (count < 3 || count > 5)) return false;
     unsigned seen = 0;
     int version = 0, rowCount = 0;
     std::array<bool, kMaxSockets> sockets{};
@@ -135,7 +161,7 @@ bool readMapBody(Parse& parse, PatchMap& candidate) {
         unsigned field = 0;
         if (parse.matchName("version")) {
             field = 1;
-            if (!parse.number(version) || (version != 1 && version != 2)) return false;
+            if (!parse.number(version) || (version < 1 || version > 3)) return false;
         } else if (parse.matchName("title")) {
             const char* text = nullptr;
             field = 2;
@@ -152,6 +178,31 @@ bool readMapBody(Parse& parse, PatchMap& candidate) {
                 if (sockets[socket]) return false;
                 sockets[socket] = true;
                 candidate.connections[socket] = connection;
+            }
+        } else if (parse.matchName("aux")) {
+            field = 16;
+            int size = 0;
+            if (!parse.numberOfArrayElements(size) || size < 0 || size > kAuxCount) return false;
+            for (int j = 0; j < size; ++j) {
+                int fields = 0, bus = 0; unsigned found = 0;
+                AuxRecord row;
+                row.present = true;
+                if (!parse.numberOfObjectMembers(fields) || fields != 3) return false;
+                for (int k = 0; k < fields; ++k) {
+                    const char* text = nullptr;
+                    if (parse.matchName("bus") && !(found & 1)) {
+                        found |= 1;
+                        if (!parse.number(bus) || bus < 1 || bus > kAuxCount) return false;
+                    } else if (parse.matchName("description") && !(found & 2)) {
+                        found |= 2;
+                        if (!parse.string(text) || !copyText(row.description, text)) return false;
+                    } else if (parse.matchName("group") && !(found & 4)) {
+                        found |= 4;
+                        if (!parse.string(text) || !copyText(row.group, text)) return false;
+                    } else return false;
+                }
+                if (candidate.aux[bus - 1].present) return false;
+                candidate.aux[bus - 1] = row;
             }
         } else if (parse.matchName("expanders")) {
             field = 8;
@@ -174,7 +225,7 @@ bool readMapBody(Parse& parse, PatchMap& candidate) {
         if (seen & field) return false;
         seen |= field;
     }
-    if (seen != (version == 1 ? 7u : 15u) || rowCount != candidate.socketCount()) return false;
+    if (seen != (version == 1 ? 7u : version == 2 ? 15u : 31u) || rowCount != candidate.socketCount()) return false;
     return std::all_of(sockets.begin(), sockets.begin() + rowCount, [](bool present) { return present; });
 }
 
